@@ -142,8 +142,13 @@
               <i data-lucide="paperclip" aria-hidden="true"></i>
               Archivos
             </button>
+            <button class="tab-button" type="button" data-tab="phases">
+              <i data-lucide="landmark" aria-hidden="true"></i>
+              Documentación
+            </button>
           </nav>
 
+          <!-- PRODUCTOS -->
           <section id="productsPanel" class="tab-panel">
             <div class="section-heading">
               <div>
@@ -160,6 +165,8 @@
                 <thead>
                   <tr>
                     <th>Producto</th>
+                    <th>Sector</th>
+                    <th>Partida</th>
                     <th>Unidad</th>
                     <th>Cantidad</th>
                     <th>Precio unitario</th>
@@ -173,6 +180,7 @@
             </div>
           </section>
 
+          <!-- COTIZACIÓN (independiente) -->
           <section id="quotePanel" class="tab-panel is-hidden">
             <div class="section-heading">
               <div>
@@ -180,6 +188,14 @@
                 <h3>Cotización</h3>
               </div>
               <div class="button-row">
+                <button id="importProductsButton" class="ghost-button" type="button">
+                  <i data-lucide="download" aria-hidden="true"></i>
+                  Importar de productos
+                </button>
+                <button id="addQuoteLineButton" class="secondary-action" type="button">
+                  <i data-lucide="plus" aria-hidden="true"></i>
+                  Agregar línea
+                </button>
                 <button id="generateQuoteButton" class="secondary-action" type="button">
                   <i data-lucide="file-plus-2" aria-hidden="true"></i>
                   Generar
@@ -191,9 +207,26 @@
               </div>
             </div>
             <div id="quoteSummary" class="quote-summary"></div>
+            <!-- Tabla editable de líneas de cotización -->
+            <div class="responsive-table" style="margin-bottom:14px">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Descripción</th>
+                    <th>Unidad</th>
+                    <th>Cantidad</th>
+                    <th>Precio unitario</th>
+                    <th>Importe</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="quoteLinesTable"></tbody>
+              </table>
+            </div>
             <article id="quotePreview" class="quote-preview"></article>
           </section>
 
+          <!-- ENTREGAS -->
           <section id="deliveriesPanel" class="tab-panel is-hidden">
             <div class="section-heading">
               <div>
@@ -215,6 +248,7 @@
                     <th>Producto</th>
                     <th>Cantidad</th>
                     <th>Recibió</th>
+                    <th>Evidencia</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -223,6 +257,7 @@
             </div>
           </section>
 
+          <!-- ARCHIVOS -->
           <section id="documentsPanel" class="tab-panel is-hidden">
             <div class="section-heading">
               <div>
@@ -272,10 +307,22 @@
               </table>
             </div>
           </section>
+
+          <!-- DOCUMENTACIÓN DE FASES -->
+          <section id="phasesPanel" class="tab-panel is-hidden">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Proceso de licitación</p>
+                <h3>Documentación por fase</h3>
+              </div>
+            </div>
+            <div id="phasesContainer" class="phases-container"></div>
+          </section>
         </section>
       </div>
     </div>
 
+    <!-- DIALOG: Nueva licitación -->
     <dialog id="tenderDialog">
       <form id="tenderForm" method="dialog" class="dialog-form">
         <div class="dialog-header">
@@ -317,6 +364,7 @@
       </form>
     </dialog>
 
+    <!-- DIALOG: Agregar producto (con sector y partida) -->
     <dialog id="productDialog">
       <form id="productForm" method="dialog" class="dialog-form">
         <div class="dialog-header">
@@ -333,6 +381,14 @@
           <label>
             Unidad
             <input id="unitInput" type="text" value="pieza" required />
+          </label>
+          <label>
+            Sector
+            <input id="sectorInput" type="text" placeholder="Ej. Salud, Educación, Infraestructura" required />
+          </label>
+          <label>
+            Partida
+            <input id="partidaInput" type="text" placeholder="Ej. 2531, 2541, 5151" required />
           </label>
           <label>
             Cantidad contratada
@@ -353,6 +409,7 @@
       </form>
     </dialog>
 
+    <!-- DIALOG: Nueva remisión (con evidencia obligatoria) -->
     <dialog id="deliveryDialog">
       <form id="deliveryForm" method="dialog" class="dialog-form">
         <div class="dialog-header">
@@ -381,10 +438,59 @@
         </div>
         <label>
           Observaciones
-          <textarea id="deliveryNotesInput" rows="3"></textarea>
+          <textarea id="deliveryNotesInput" rows="2"></textarea>
+        </label>
+        <label class="evidence-label">
+          <span class="evidence-required-badge"><i data-lucide="shield-alert" aria-hidden="true"></i> Evidencia obligatoria</span>
+          Adjunta PDF o imagen de la remisión / evidencia de entrega
+          <input
+            id="deliveryEvidenceFile"
+            type="file"
+            accept=".pdf,image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff"
+            required
+          />
+          <p id="evidenceError" class="form-error"></p>
         </label>
         <div class="dialog-actions">
           <button class="ghost-button" type="button" data-close-dialog="deliveryDialog">Cancelar</button>
+          <button class="primary-action" type="submit">
+            <i data-lucide="save" aria-hidden="true"></i>
+            Guardar remisión
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- DIALOG: Agregar línea a cotización -->
+    <dialog id="quoteLineDialog">
+      <form id="quoteLineForm" method="dialog" class="dialog-form">
+        <div class="dialog-header">
+          <h2 id="quoteLineDialogTitle">Agregar línea</h2>
+          <button class="icon-button" type="button" data-close-dialog="quoteLineDialog" title="Cerrar">
+            <i data-lucide="x" aria-hidden="true"></i>
+          </button>
+        </div>
+        <input id="quoteLineIdInput" type="hidden" />
+        <div class="form-grid">
+          <label style="grid-column:1/-1">
+            Descripción
+            <input id="quoteLineDescInput" type="text" required />
+          </label>
+          <label>
+            Unidad
+            <input id="quoteLineUnitInput" type="text" value="pieza" required />
+          </label>
+          <label>
+            Cantidad
+            <input id="quoteLineQtyInput" type="number" min="0" step="0.01" required />
+          </label>
+          <label style="grid-column:1/-1">
+            Precio unitario sin IVA
+            <input id="quoteLinePriceInput" type="number" min="0" step="0.01" required />
+          </label>
+        </div>
+        <div class="dialog-actions">
+          <button class="ghost-button" type="button" data-close-dialog="quoteLineDialog">Cancelar</button>
           <button class="primary-action" type="submit">
             <i data-lucide="save" aria-hidden="true"></i>
             Guardar
@@ -393,6 +499,41 @@
       </form>
     </dialog>
 
+    <!-- DIALOG: Subir documento de fase -->
+    <dialog id="phaseUploadDialog">
+      <form id="phaseUploadForm" method="dialog" class="dialog-form">
+        <div class="dialog-header">
+          <h2 id="phaseUploadTitle">Subir documento</h2>
+          <button class="icon-button" type="button" data-close-dialog="phaseUploadDialog" title="Cerrar">
+            <i data-lucide="x" aria-hidden="true"></i>
+          </button>
+        </div>
+        <input id="phaseIdInput" type="hidden" />
+        <label>
+          Descripción del documento
+          <input id="phaseDocNameInput" type="text" placeholder="Ej. Convocatoria oficial" required />
+        </label>
+        <label>
+          Archivo (PDF o imagen)
+          <input
+            id="phaseDocFile"
+            type="file"
+            accept=".pdf,image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.doc,.docx,.xls,.xlsx"
+            required
+          />
+        </label>
+        <p id="phaseUploadStatus" class="upload-status" role="status"></p>
+        <div class="dialog-actions">
+          <button class="ghost-button" type="button" data-close-dialog="phaseUploadDialog">Cancelar</button>
+          <button class="primary-action" type="submit">
+            <i data-lucide="upload-cloud" aria-hidden="true"></i>
+            Subir documento
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- DIALOG: Usuarios -->
     <dialog id="usersDialog">
       <form id="userForm" method="dialog" class="dialog-form">
         <div class="dialog-header">
