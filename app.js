@@ -3,7 +3,7 @@ const ADMIN_PASSWORD = "adminmike2026_ylikadev_2026";
 const ADMIN_NAME = "Administrador";
 const STORAGE_KEY = "ylika_tender_admin_state";
 const SESSION_KEY = "ylika_tender_admin_session";
-const DRIVE_ENDPOINT =
+const GOOGLE_DRIVE_WEBHOOK =
   "https://script.google.com/macros/s/AKfycbzRW_LJUTKNhcGo9tJCZGpdz44ZOxROajeasmfeLh2bYl7UD7dCddIWv8Mawy67QNEg/exec";
 const IVA_RATE = 0.16;
 
