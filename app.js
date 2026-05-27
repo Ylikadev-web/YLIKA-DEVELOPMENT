@@ -1,138 +1,331 @@
-const ADMIN_USER = "admin";
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const ADMIN_USER     = "admin";
 const ADMIN_PASSWORD = "adminmike2026_ylikadev_2026";
-const ADMIN_NAME = "Administrador";
-const STORAGE_KEY = "ylika_tender_admin_state";
-const SESSION_KEY = "ylika_tender_admin_session";
-// Drive endpoint: tu Apps Script debe estar publicado como "Anyone, even anonymous"
-// y debe aceptar POST con JSON (no FormData).
-const DRIVE_ENDPOINT =
-  "https://script.google.com/macros/s/AKfycbzRW_LJUTKNhcGo9tJCZGpdz44ZOxROajeasmfeLh2bYl7UD7dCddIWv8Mawy67QNEg/exec";
-const IVA_RATE = 0.16;
+const ADMIN_NAME     = "Administrador";
+const STORAGE_KEY    = "ylika_tender_admin_state";
+const SESSION_KEY    = "ylika_tender_admin_session";
+const IVA_RATE       = 0.16;
 
-// Fases estándar de una licitación pública en México (Ley de Adquisiciones)
+// ⚠️  Reemplaza con tu webhook real.
+// El Google Apps Script debe aceptar POST con body JSON en e.postData.contents
+// y debe estar publicado como "Cualquier usuario, incluso anónimo".
+const GOOGLE_DRIVE_WEBHOOK =
+  "https://script.google.com/macros/s/AKfycbzRW_LJUTKNhcGo9tJCZGpdz44ZOxROajeasmfeLh2bYl7UD7dCddIWv8Mawy67QNEg/exec";
+
+// Fases del proceso licitatorio en México (Ley de Adquisiciones)
 const LICITACION_PHASES = [
-  {
-    id: "fase_convocatoria",
-    name: "Convocatoria / Invitación",
-    description: "Publicación en CompraNet, DOF o convocatoria restringida. Incluye bases, especificaciones técnicas y calendario.",
-    icon: "megaphone",
-    color: "var(--accent)",
-  },
-  {
-    id: "fase_junta",
-    name: "Junta de Aclaraciones",
-    description: "Reunión para resolver dudas sobre las bases. Las respuestas forman parte integral de la convocatoria.",
-    icon: "message-circle-question",
-    color: "var(--violet)",
-  },
-  {
-    id: "fase_presentacion",
-    name: "Presentación y Apertura de Proposiciones",
-    description: "Recepción de sobres con propuestas técnicas y económicas. Acto público con levantamiento de acta.",
-    icon: "package-open",
-    color: "var(--warning)",
-  },
-  {
-    id: "fase_evaluacion",
-    name: "Evaluación de Proposiciones",
-    description: "Análisis técnico y económico de las propuestas recibidas. Verificación de requisitos y criterios de evaluación.",
-    icon: "clipboard-list",
-    color: "#38a8ff",
-  },
-  {
-    id: "fase_fallo",
-    name: "Fallo",
-    description: "Comunicación oficial del resultado. Se indica el proveedor adjudicado y los montos. Se levanta acta de fallo.",
-    icon: "gavel",
-    color: "var(--success)",
-  },
-  {
-    id: "fase_contrato",
-    name: "Firma de Contrato",
-    description: "Formalización del instrumento jurídico entre la dependencia y el proveedor adjudicado.",
-    icon: "file-signature",
-    color: "var(--accent)",
-  },
-  {
-    id: "fase_ejecucion",
-    name: "Ejecución / Entregas",
-    description: "Cumplimiento del objeto contractual: entregas parciales, supervisión y verificación de calidad.",
-    icon: "truck",
-    color: "var(--warning)",
-  },
-  {
-    id: "fase_finiquito",
-    name: "Finiquito y Cierre",
-    description: "Verificación de cumplimiento total, devolución de garantías, factura final y cierre administrativo.",
-    icon: "check-circle-2",
-    color: "var(--success)",
-  },
+  { id: "p1", name: "Convocatoria / Invitación",        icon: "megaphone",              color: "var(--accent)",   desc: "Publicación en CompraNet, DOF o convocatoria restringida. Bases, especificaciones técnicas y calendario." },
+  { id: "p2", name: "Junta de Aclaraciones",            icon: "message-circle-question", color: "var(--violet)",   desc: "Reunión para resolver dudas sobre las bases. Las respuestas integran la convocatoria." },
+  { id: "p3", name: "Presentación y Apertura",          icon: "package-open",            color: "var(--warning)",  desc: "Recepción de sobres con propuestas técnicas y económicas. Acto público con levantamiento de acta." },
+  { id: "p4", name: "Evaluación de Proposiciones",      icon: "clipboard-list",          color: "#38a8ff",         desc: "Análisis técnico y económico. Verificación de requisitos y criterios." },
+  { id: "p5", name: "Fallo",                            icon: "gavel",                   color: "var(--success)",  desc: "Comunicación oficial del resultado. Se indica el proveedor adjudicado y los montos." },
+  { id: "p6", name: "Firma de Contrato",                icon: "file-signature",          color: "var(--accent)",   desc: "Formalización del instrumento jurídico entre la dependencia y el proveedor." },
+  { id: "p7", name: "Ejecución / Entregas",             icon: "truck",                   color: "var(--warning)",  desc: "Cumplimiento: entregas parciales, supervisión y verificación de calidad." },
+  { id: "p8", name: "Finiquito y Cierre",               icon: "check-circle-2",          color: "var(--success)",  desc: "Verificación de cumplimiento total, devolución de garantías, factura final y cierre administrativo." },
 ];
 
+// ─── STATE ───────────────────────────────────────────────────────────────────
 const state = {
   tenders: [],
-  users: [],
+  users:   [],
   activeTenderId: null,
   activeTab: "products",
   search: "",
 };
 
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
-const money = new Intl.NumberFormat("es-MX", {
-  style: "currency",
-  currency: "MXN",
-});
-const number = new Intl.NumberFormat("es-MX", {
-  maximumFractionDigits: 2,
-});
-const dateFormatter = new Intl.DateTimeFormat("es-MX", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
+const money  = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
+const number = new Intl.NumberFormat("es-MX", { maximumFractionDigits: 2 });
+const dateFormatter = new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 
-document.addEventListener("DOMContentLoaded", init);
+function createId(prefix) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+function toPositiveNumber(v) {
+  const n = Number(v); return Number.isFinite(n) && n > 0 ? n : 0;
+}
+function today() { return new Date().toISOString().slice(0, 10); }
+function formatDate(v) {
+  if (!v) return "Sin fecha";
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  const d = m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date(v);
+  return isNaN(d) ? "Sin fecha" : dateFormatter.format(d);
+}
+function formatFileSize(b) {
+  if (!b) return "0 B";
+  const u = ["B","KB","MB","GB"]; let s = b, i = 0;
+  while (s >= 1024 && i < u.length-1) { s /= 1024; i++; }
+  return `${number.format(s)} ${u[i]}`;
+}
+function escapeHtml(v) {
+  return String(v ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+}
+function escapeAttr(v) { return escapeHtml(v).replaceAll("`","&#096;"); }
+function emptyRow(txt, cols) {
+  const r = document.createElement("tr");
+  r.innerHTML = `<td colspan="${cols}" class="empty-row">${escapeHtml(txt)}</td>`;
+  return r;
+}
+function refreshIcons() { if (window.lucide) window.lucide.createIcons(); }
+function readFileAsDataUrl(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = () => res(String(r.result));
+    r.onerror = () => rej(r.error);
+    r.readAsDataURL(file);
+  });
+}
 
-function init() {
+// ─── DRIVE UPLOAD ─────────────────────────────────────────────────────────────
+// Con fetch mode:"no-cors" no podemos leer la respuesta, pero el Apps Script
+// recibirá el JSON en e.postData.contents.
+// En tu Apps Script usa: const body = JSON.parse(e.postData.contents);
+async function uploadToDrive(file, meta, tender) {
+  const dataUrl  = await readFileAsDataUrl(file);
+  const payload  = {
+    fileName:     file.name,
+    mimeType:     file.type || "application/octet-stream",
+    fileBase64:   dataUrl.split(",")[1] || "",
+    documentType: meta.type  || "Archivo",
+    tenderId:     tender.id,
+    tenderName:   tender.name,
+    contract:     tender.contract,
+    client:       tender.client,
+    uploadedAt:   meta.uploadedAt,
+  };
+  await fetch(GOOGLE_DRIVE_WEBHOOK, {
+    method:  "POST",
+    mode:    "no-cors",         // permite cross-origin sin preflight
+    headers: { "Content-Type": "text/plain" },  // text/plain no dispara preflight
+    body:    JSON.stringify(payload),
+  });
+  // Con no-cors la respuesta es opaque; no podemos leer la URL generada.
+  return "";
+}
+
+// ─── NORMALIZE ───────────────────────────────────────────────────────────────
+function normalizeUser(u) {
+  return {
+    id:        u.id        || createId("usr"),
+    username:  String(u.username || "").trim().toLowerCase(),
+    password:  String(u.password || ""),
+    name:      String(u.name || u.username || "").trim(),
+    role:      u.role      || "Usuario",
+    isAdmin:   Boolean(u.isAdmin),
+    protected: Boolean(u.protected),
+    createdAt: u.createdAt || new Date().toISOString(),
+  };
+}
+
+function normalizeProduct(p) {
+  return {
+    id:          p.id         || createId("prd"),
+    name:        p.name       || "",
+    unit:        p.unit       || "pieza",
+    sector:      p.sector     || "",
+    partida:     p.partida    || "",
+    quantity:    Number(p.quantity)   || 0,
+    unitPrice:   Number(p.unitPrice)  || 0,
+    profitPct:   Number(p.profitPct)  || 0,
+    contractType: p.contractType || "in",           // "in" | "out"
+    substituteId: p.substituteId || "",             // id del producto que sustituye
+  };
+}
+
+function normalizeOrder(o) {
+  return {
+    id:          o.id          || createId("ord"),
+    number:      o.number      || "",
+    productId:   o.productId   || "",
+    qtyOrdered:  Number(o.qtyOrdered)  || 0,
+    qtyDelivered:Number(o.qtyDelivered)|| 0,
+    date:        o.date        || today(),
+    eta:         o.eta         || "",
+    requestedBy: o.requestedBy || "",
+    notes:       o.notes       || "",
+    status:      o.status      || "Pendiente",   // Pendiente | Parcial | Entregado | Cancelado
+    deliveries:  Array.isArray(o.deliveries) ? o.deliveries.map(normalizeOrderDelivery) : [],
+    createdAt:   o.createdAt   || new Date().toISOString(),
+  };
+}
+
+function normalizeOrderDelivery(d) {
+  return {
+    id:           d.id           || createId("od"),
+    qty:          Number(d.qty)  || 0,
+    date:         d.date         || today(),
+    receivedBy:   d.receivedBy   || "",
+    remisionNum:  d.remisionNum  || "",
+    notes:        d.notes        || "",
+    evidenceName: d.evidenceName || "",
+    evidenceSize: Number(d.evidenceSize) || 0,
+    evidenceMime: d.evidenceMime || "",
+    evidenceStatus: d.evidenceStatus || "",
+    evidenceDriveUrl: d.evidenceDriveUrl || "",
+    createdAt:    d.createdAt    || new Date().toISOString(),
+  };
+}
+
+function normalizeDocument(d) {
+  return {
+    id:         d.id         || createId("doc"),
+    type:       d.type       || "Otro",
+    name:       d.name       || "",
+    mime:       d.mime       || "",
+    size:       Number(d.size) || 0,
+    status:     d.status     || "Registrado",
+    uploadedAt: d.uploadedAt || new Date().toISOString(),
+    driveUrl:   d.driveUrl   || "",
+  };
+}
+
+function normalizeQuoteLine(l) {
+  return {
+    id:          l.id          || createId("ql"),
+    description: l.description || "",
+    unit:        l.unit        || "pieza",
+    quantity:    Number(l.quantity)  || 0,
+    unitPrice:   Number(l.unitPrice) || 0,
+  };
+}
+
+function normalizePhaseDoc(d) {
+  return {
+    id:         d.id         || createId("phd"),
+    name:       d.name       || "",
+    mime:       d.mime       || "",
+    size:       Number(d.size) || 0,
+    status:     d.status     || "Registrado",
+    uploadedAt: d.uploadedAt || new Date().toISOString(),
+    driveUrl:   d.driveUrl   || "",
+  };
+}
+
+function normalizePhaseDocs(raw) {
+  const result = {};
+  LICITACION_PHASES.forEach(ph => {
+    result[ph.id] = Array.isArray(raw?.[ph.id]) ? raw[ph.id].map(normalizePhaseDoc) : [];
+  });
+  return result;
+}
+
+function normalizeTender(t) {
+  return {
+    id:             t.id             || createId("lic"),
+    name:           t.name           || "",
+    client:         t.client         || "",
+    contract:       t.contract       || "",
+    deadline:       t.deadline       || "",
+    notes:          t.notes          || "",
+    status:         t.status         || "Activa",
+    createdAt:      t.createdAt      || new Date().toISOString(),
+    quoteNumber:    t.quoteNumber    || "",
+    quoteCreatedAt: t.quoteCreatedAt || "",
+    quoteUpdatedAt: t.quoteUpdatedAt || "",
+    products:   Array.isArray(t.products)   ? t.products.map(normalizeProduct)   : [],
+    orders:     Array.isArray(t.orders)     ? t.orders.map(normalizeOrder)       : [],
+    documents:  Array.isArray(t.documents)  ? t.documents.map(normalizeDocument) : [],
+    quoteLines: Array.isArray(t.quoteLines) ? t.quoteLines.map(normalizeQuoteLine): [],
+    phaseDocs:  normalizePhaseDocs(t.phaseDocs),
+  };
+}
+
+function normalizeUsers(users) {
+  const normalized = Array.isArray(users)
+    ? users.map(normalizeUser).filter(u => u.username && u.password) : [];
+  const admin = normalized.find(u => u.username === ADMIN_USER);
+  if (admin) {
+    Object.assign(admin, { password: ADMIN_PASSWORD, name: admin.name||ADMIN_NAME, role:"Admin", isAdmin:true, protected:true });
+    return [admin, ...normalized.filter(u => u.id !== admin.id)];
+  }
+  return [normalizeUser({ id:"usr_admin", username:ADMIN_USER, password:ADMIN_PASSWORD, name:ADMIN_NAME, role:"Admin", isAdmin:true, protected:true, createdAt:new Date().toISOString() }), ...normalized];
+}
+
+// ─── STORAGE ─────────────────────────────────────────────────────────────────
+function loadState() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (!stored || !Array.isArray(stored.tenders)) { state.users = normalizeUsers([]); return; }
+    state.tenders       = stored.tenders.map(normalizeTender);
+    state.users         = normalizeUsers(stored.users);
+    state.activeTenderId= stored.activeTenderId || state.tenders[0]?.id || null;
+  } catch {
+    state.tenders = []; state.users = normalizeUsers([]); state.activeTenderId = null;
+  }
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    tenders: state.tenders, users: state.users, activeTenderId: state.activeTenderId,
+  }));
+}
+
+function getActiveTender() {
+  return state.tenders.find(t => t.id === state.activeTenderId) || null;
+}
+function getCurrentUser() {
+  const u = sessionStorage.getItem(SESSION_KEY);
+  return u ? state.users.find(x => x.username === u) || null : null;
+}
+function getFinancials(tender) {
+  // Uses quoteLines if they exist, otherwise falls back to products
+  const lines = tender.quoteLines?.length ? tender.quoteLines : [];
+  const sub = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
+  return { subtotal: sub, iva: sub * IVA_RATE, total: sub * (1 + IVA_RATE) };
+}
+function getProductTotal(p) { return p.quantity * p.unitPrice * (1 + IVA_RATE); }
+function getOrderDeliveredQty(order) {
+  return order.deliveries.reduce((s, d) => s + d.qty, 0);
+}
+function getProductOrderedQty(tender, productId) {
+  return tender.orders.filter(o => o.productId === productId && o.status !== "Cancelado")
+    .reduce((s, o) => s + o.qtyOrdered, 0);
+}
+function getProductDeliveredQty(tender, productId) {
+  return tender.orders.filter(o => o.productId === productId)
+    .flatMap(o => o.deliveries).reduce((s, d) => s + d.qty, 0);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
   loadState();
   bindEvents();
   renderAuth();
-}
+});
 
+// ─── BIND EVENTS ─────────────────────────────────────────────────────────────
 function bindEvents() {
   $("loginForm").addEventListener("submit", handleLogin);
   $("logoutButton").addEventListener("click", handleLogout);
   $("usersButton").addEventListener("click", openUsersDialog);
   $("newTenderButton").addEventListener("click", () => openTenderDialog());
-  document.querySelectorAll("[data-open-tender]").forEach((button) => {
-    button.addEventListener("click", () => openTenderDialog());
-  });
-  document.querySelectorAll("[data-close-dialog]").forEach((button) => {
-    button.addEventListener("click", () => closeDialog(button.dataset.closeDialog));
+  document.querySelectorAll("[data-open-tender]").forEach(b => b.addEventListener("click", () => openTenderDialog()));
+
+  // Close dialogs — only the static ones; dynamic ones get bound in open*
+  document.querySelectorAll("[data-close-dialog]").forEach(b => {
+    b.addEventListener("click", () => closeDialog(b.dataset.closeDialog));
   });
 
-  $("searchInput").addEventListener("input", (event) => {
-    state.search = event.target.value.trim().toLowerCase();
-    renderTenderList();
-  });
+  $("searchInput").addEventListener("input", e => { state.search = e.target.value.trim().toLowerCase(); renderTenderList(); });
 
   $("tenderForm").addEventListener("submit", handleTenderSubmit);
   $("productForm").addEventListener("submit", handleProductSubmit);
-  $("deliveryForm").addEventListener("submit", handleDeliverySubmit);
+  $("orderForm").addEventListener("submit", handleOrderSubmit);
+  $("orderDeliveryForm").addEventListener("submit", handleOrderDeliverySubmit);
   $("uploadForm").addEventListener("submit", handleUploadSubmit);
   $("userForm").addEventListener("submit", handleUserSubmit);
   $("quoteLineForm").addEventListener("submit", handleQuoteLineSubmit);
   $("phaseUploadForm").addEventListener("submit", handlePhaseUploadSubmit);
 
-  $("editTenderButton").addEventListener("click", () => {
-    const tender = getActiveTender();
-    if (tender) openTenderDialog(tender);
-  });
+  $("editTenderButton").addEventListener("click", () => { const t = getActiveTender(); if (t) openTenderDialog(t); });
   $("deleteTenderButton").addEventListener("click", deleteActiveTender);
-  $("statusSelect").addEventListener("change", handleStatusChange);
+  $("statusSelect").addEventListener("change", e => { const t = getActiveTender(); if (!t) return; t.status = e.target.value; saveState(); render(); });
 
-  $("newProductButton").addEventListener("click", () => openProductDialog());
-  $("newDeliveryButton").addEventListener("click", () => openDeliveryDialog());
+  $("newProductButton").addEventListener("click", openProductDialog);
+  $("newOrderButton").addEventListener("click", openOrderDialog);
+
+  // Quote buttons — bound here so they always work
   $("generateQuoteButton").addEventListener("click", generateQuote);
   $("printQuoteButton").addEventListener("click", printQuote);
   $("addQuoteLineButton").addEventListener("click", () => openQuoteLineDialog());
@@ -140,235 +333,59 @@ function bindEvents() {
 
   $("productsTable").addEventListener("change", handleProductTableChange);
   $("productsTable").addEventListener("click", handleProductTableClick);
-  $("deliveriesTable").addEventListener("click", handleDeliveryTableClick);
   $("documentsTable").addEventListener("click", handleDocumentTableClick);
   $("quoteLinesTable").addEventListener("click", handleQuoteLineTableClick);
   $("usersTable").addEventListener("click", handleUsersTableClick);
 
-  document.querySelectorAll(".tab-button").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.activeTab = button.dataset.tab;
-      renderDetail();
+  // Product dialog price calculator
+  ["priceInput","profitInput"].forEach(id => {
+    $(id).addEventListener("input", updatePriceCalc);
+  });
+
+  // Contract type radio toggle
+  document.querySelectorAll("input[name='contractType']").forEach(r => {
+    r.addEventListener("change", () => {
+      const isOut = $("contractTypeOut").checked;
+      $("substituteRow").classList.toggle("is-hidden", !isOut);
     });
+  });
+
+  document.querySelectorAll(".tab-button").forEach(b => {
+    b.addEventListener("click", () => { state.activeTab = b.dataset.tab; renderDetail(); });
   });
 }
 
-// ─── AUTH ────────────────────────────────────────────────────────────────────
-
-function handleLogin(event) {
-  event.preventDefault();
-  const username = $("usernameInput").value.trim().toLowerCase();
-  const password = $("passwordInput").value;
-  const user = state.users.find(
-    (item) => item.username.toLowerCase() === username && item.password === password,
-  );
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+function handleLogin(e) {
+  e.preventDefault();
+  const u = $("usernameInput").value.trim().toLowerCase();
+  const p = $("passwordInput").value;
+  const user = state.users.find(x => x.username === u && x.password === p);
   if (user) {
     sessionStorage.setItem(SESSION_KEY, user.username);
     $("loginError").textContent = "";
     $("passwordInput").value = "";
-    renderAuth();
-    return;
+    renderAuth(); return;
   }
   $("loginError").textContent = "Usuario o contraseña incorrectos.";
 }
-
-function handleLogout() {
-  sessionStorage.removeItem(SESSION_KEY);
-  renderAuth();
-}
-
+function handleLogout() { sessionStorage.removeItem(SESSION_KEY); renderAuth(); }
 function renderAuth() {
-  const currentUser = getCurrentUser();
-  const isLoggedIn = Boolean(currentUser);
-  $("loginScreen").classList.toggle("is-hidden", isLoggedIn);
-  $("appShell").classList.toggle("is-hidden", !isLoggedIn);
-  if (isLoggedIn) {
-    $("currentUserLabel").textContent = currentUser.name || currentUser.username;
-    $("usersButton").classList.toggle("is-hidden", !currentUser.isAdmin);
+  const cu = getCurrentUser();
+  const ok = Boolean(cu);
+  $("loginScreen").classList.toggle("is-hidden", ok);
+  $("appShell").classList.toggle("is-hidden", !ok);
+  if (ok) {
+    $("currentUserLabel").textContent = cu.name || cu.username;
+    $("usersButton").classList.toggle("is-hidden", !cu.isAdmin);
     render();
   }
   refreshIcons();
 }
 
-// ─── STATE ───────────────────────────────────────────────────────────────────
-
-function loadState() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (!stored || !Array.isArray(stored.tenders)) {
-      state.users = getDefaultUsers();
-      return;
-    }
-    state.tenders = stored.tenders.map(normalizeTender);
-    state.users = normalizeUsers(stored.users);
-    state.activeTenderId = stored.activeTenderId || state.tenders[0]?.id || null;
-  } catch {
-    state.tenders = [];
-    state.users = getDefaultUsers();
-    state.activeTenderId = null;
-  }
-  if (!state.users.length) {
-    state.users = getDefaultUsers();
-  }
-}
-
-function saveState() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      tenders: state.tenders,
-      users: state.users,
-      activeTenderId: state.activeTenderId,
-    }),
-  );
-}
-
-function getDefaultUsers() {
-  return [
-    normalizeUser({
-      id: "usr_admin",
-      username: ADMIN_USER,
-      password: ADMIN_PASSWORD,
-      name: ADMIN_NAME,
-      role: "Admin",
-      isAdmin: true,
-      protected: true,
-      createdAt: new Date().toISOString(),
-    }),
-  ];
-}
-
-function normalizeUsers(users) {
-  const normalized = Array.isArray(users)
-    ? users.map(normalizeUser).filter((user) => user.username && user.password)
-    : [];
-  const admin = normalized.find((user) => user.username.toLowerCase() === ADMIN_USER);
-  if (admin) {
-    admin.password = ADMIN_PASSWORD;
-    admin.name = admin.name || ADMIN_NAME;
-    admin.role = "Admin";
-    admin.isAdmin = true;
-    admin.protected = true;
-    return [admin, ...normalized.filter((user) => user.id !== admin.id)];
-  }
-  return [...getDefaultUsers(), ...normalized];
-}
-
-function normalizeUser(user) {
-  return {
-    id: user.id || createId("usr"),
-    username: String(user.username || "").trim().toLowerCase(),
-    password: String(user.password || ""),
-    name: String(user.name || user.username || "").trim(),
-    role: user.role || "Usuario",
-    isAdmin: Boolean(user.isAdmin),
-    protected: Boolean(user.protected),
-    createdAt: user.createdAt || new Date().toISOString(),
-  };
-}
-
-function normalizeTender(tender) {
-  return {
-    id: tender.id || createId("lic"),
-    name: tender.name || "",
-    client: tender.client || "",
-    contract: tender.contract || "",
-    deadline: tender.deadline || "",
-    notes: tender.notes || "",
-    status: tender.status || "Activa",
-    createdAt: tender.createdAt || new Date().toISOString(),
-    quoteNumber: tender.quoteNumber || "",
-    quoteCreatedAt: tender.quoteCreatedAt || "",
-    quoteUpdatedAt: tender.quoteUpdatedAt || "",
-    products: Array.isArray(tender.products) ? tender.products.map(normalizeProduct) : [],
-    deliveries: Array.isArray(tender.deliveries) ? tender.deliveries.map(normalizeDelivery) : [],
-    documents: Array.isArray(tender.documents) ? tender.documents.map(normalizeDocument) : [],
-    quoteLines: Array.isArray(tender.quoteLines) ? tender.quoteLines.map(normalizeQuoteLine) : [],
-    // phases: object keyed by phase id, each with array of docs
-    phaseDocs: tender.phaseDocs && typeof tender.phaseDocs === "object" ? normalizePhaseDocs(tender.phaseDocs) : {},
-  };
-}
-
-function normalizeProduct(product) {
-  return {
-    id: product.id || createId("prd"),
-    name: product.name || "",
-    unit: product.unit || "pieza",
-    sector: product.sector || "",
-    partida: product.partida || "",
-    quantity: Number(product.quantity) || 0,
-    unitPrice: Number(product.unitPrice) || 0,
-  };
-}
-
-function normalizeDelivery(delivery) {
-  return {
-    id: delivery.id || createId("rem"),
-    number: delivery.number || "",
-    productId: delivery.productId || "",
-    quantity: Number(delivery.quantity) || 0,
-    date: delivery.date || today(),
-    receivedBy: delivery.receivedBy || "",
-    notes: delivery.notes || "",
-    evidenceName: delivery.evidenceName || "",
-    evidenceSize: Number(delivery.evidenceSize) || 0,
-    evidenceMime: delivery.evidenceMime || "",
-    evidenceDriveUrl: delivery.evidenceDriveUrl || "",
-    evidenceStatus: delivery.evidenceStatus || "",
-    createdAt: delivery.createdAt || new Date().toISOString(),
-  };
-}
-
-function normalizeDocument(documentRecord) {
-  return {
-    id: documentRecord.id || createId("doc"),
-    type: documentRecord.type || "Otro",
-    name: documentRecord.name || "",
-    mime: documentRecord.mime || "",
-    size: Number(documentRecord.size) || 0,
-    status: documentRecord.status || "Registrado",
-    uploadedAt: documentRecord.uploadedAt || new Date().toISOString(),
-    driveUrl: documentRecord.driveUrl || "",
-  };
-}
-
-function normalizeQuoteLine(line) {
-  return {
-    id: line.id || createId("ql"),
-    description: line.description || "",
-    unit: line.unit || "pieza",
-    quantity: Number(line.quantity) || 0,
-    unitPrice: Number(line.unitPrice) || 0,
-  };
-}
-
-function normalizePhaseDocs(phaseDocs) {
-  const result = {};
-  LICITACION_PHASES.forEach((phase) => {
-    const docs = phaseDocs[phase.id];
-    result[phase.id] = Array.isArray(docs) ? docs.map(normalizePhaseDoc) : [];
-  });
-  return result;
-}
-
-function normalizePhaseDoc(doc) {
-  return {
-    id: doc.id || createId("phd"),
-    name: doc.name || "",
-    mime: doc.mime || "",
-    size: Number(doc.size) || 0,
-    status: doc.status || "Registrado",
-    uploadedAt: doc.uploadedAt || new Date().toISOString(),
-    driveUrl: doc.driveUrl || "",
-  };
-}
-
-// ─── RENDER ──────────────────────────────────────────────────────────────────
-
+// ─── RENDER ───────────────────────────────────────────────────────────────────
 function render() {
-  if (!state.activeTenderId && state.tenders.length) {
-    state.activeTenderId = state.tenders[0].id;
-  }
+  if (!state.activeTenderId && state.tenders.length) state.activeTenderId = state.tenders[0].id;
   renderMetrics();
   renderTenderList();
   renderDetail();
@@ -377,487 +394,542 @@ function render() {
 }
 
 function renderMetrics() {
-  const totalContracted = state.tenders.reduce(
-    (sum, tender) => sum + getFinancials(tender).total,
-    0,
-  );
-  const contractedUnits = state.tenders.reduce(
-    (sum, tender) => sum + tender.products.reduce((inner, product) => inner + product.quantity, 0),
-    0,
-  );
-  const deliveredUnits = state.tenders.reduce(
-    (sum, tender) =>
-      sum + tender.deliveries.reduce((inner, delivery) => inner + delivery.quantity, 0),
-    0,
-  );
-  const documentCount = state.tenders.reduce(
-    (sum, tender) => sum + tender.documents.length,
-    0,
-  );
-  const progress = contractedUnits ? Math.min(100, (deliveredUnits / contractedUnits) * 100) : 0;
-
-  $("totalTenders").textContent = state.tenders.length;
-  $("contractedTotal").textContent = money.format(totalContracted);
-  $("deliveredTotal").textContent = `${number.format(progress)}%`;
-  $("documentTotal").textContent = documentCount;
+  const total = state.tenders.reduce((s, t) => s + getFinancials(t).total, 0);
+  const cUnits = state.tenders.reduce((s, t) => s + t.products.reduce((x, p) => x + p.quantity, 0), 0);
+  const dUnits = state.tenders.reduce((s, t) => s + t.orders.flatMap(o=>o.deliveries).reduce((x, d) => x + d.qty, 0), 0);
+  const docs   = state.tenders.reduce((s, t) => s + t.documents.length, 0);
+  const pct    = cUnits ? Math.min(100, (dUnits / cUnits) * 100) : 0;
+  $("totalTenders").textContent   = state.tenders.length;
+  $("contractedTotal").textContent= money.format(total);
+  $("deliveredTotal").textContent = `${number.format(pct)}%`;
+  $("documentTotal").textContent  = docs;
 }
 
 function renderTenderList() {
-  const list = $("tenderList");
-  list.replaceChildren();
-  const filtered = state.tenders.filter((tender) => {
-    const haystack = `${tender.name} ${tender.client} ${tender.contract}`.toLowerCase();
-    return haystack.includes(state.search);
-  });
-
+  const list = $("tenderList"); list.replaceChildren();
+  const filtered = state.tenders.filter(t =>
+    `${t.name} ${t.client} ${t.contract}`.toLowerCase().includes(state.search));
   if (!filtered.length) {
-    const empty = document.createElement("p");
-    empty.className = "empty-row";
-    empty.textContent = state.search ? "Sin coincidencias." : "Sin licitaciones.";
-    list.append(empty);
-    return;
+    const p = document.createElement("p"); p.className = "empty-row";
+    p.textContent = state.search ? "Sin coincidencias." : "Sin licitaciones.";
+    list.append(p); return;
   }
-
-  filtered.forEach((tender) => {
-    const financials = getFinancials(tender);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "tender-card";
-    button.classList.toggle("is-active", tender.id === state.activeTenderId);
-    button.addEventListener("click", () => {
-      state.activeTenderId = tender.id;
-      saveState();
-      render();
-    });
-    button.innerHTML = `
-      <span class="status-pill" data-status="${escapeHtml(tender.status)}">${escapeHtml(tender.status)}</span>
-      <strong>${escapeHtml(tender.name)}</strong>
-      <small>${escapeHtml(tender.client)} · ${escapeHtml(tender.contract)}</small>
-      <small>${money.format(financials.total)}</small>
-    `;
-    list.append(button);
+  filtered.forEach(t => {
+    const f = getFinancials(t);
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "tender-card";
+    btn.classList.toggle("is-active", t.id === state.activeTenderId);
+    btn.addEventListener("click", () => { state.activeTenderId = t.id; saveState(); render(); });
+    btn.innerHTML = `
+      <span class="status-pill" data-status="${escapeHtml(t.status)}">${escapeHtml(t.status)}</span>
+      <strong>${escapeHtml(t.name)}</strong>
+      <small>${escapeHtml(t.client)} · ${escapeHtml(t.contract)}</small>
+      <small>${money.format(f.total)}</small>`;
+    list.append(btn);
   });
 }
 
 function renderDetail() {
-  const tender = getActiveTender();
-  $("emptyState").classList.toggle("is-hidden", Boolean(tender));
-  $("detailView").classList.toggle("is-hidden", !tender);
-  if (!tender) return;
+  const t = getActiveTender();
+  $("emptyState").classList.toggle("is-hidden", Boolean(t));
+  $("detailView").classList.toggle("is-hidden", !t);
+  if (!t) return;
 
-  $("detailMeta").textContent = `${tender.contract} · ${formatDate(tender.deadline)}`;
-  $("detailTitle").textContent = tender.name;
-  $("detailClient").textContent = tender.client;
-  $("statusSelect").value = tender.status;
+  $("detailMeta").textContent   = `${t.contract} · ${formatDate(t.deadline)}`;
+  $("detailTitle").textContent  = t.name;
+  $("detailClient").textContent = t.client;
+  $("statusSelect").value       = t.status;
 
-  document.querySelectorAll(".tab-button").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.tab === state.activeTab);
-  });
-  const panels = {
-    products: $("productsPanel"),
-    quote: $("quotePanel"),
-    deliveries: $("deliveriesPanel"),
-    documents: $("documentsPanel"),
-    phases: $("phasesPanel"),
-  };
-  Object.entries(panels).forEach(([key, panel]) => {
-    panel.classList.toggle("is-hidden", key !== state.activeTab);
-  });
+  document.querySelectorAll(".tab-button").forEach(b => b.classList.toggle("is-active", b.dataset.tab === state.activeTab));
+  const panels = { products:"productsPanel", orders:"ordersPanel", quote:"quotePanel", documents:"documentsPanel", phases:"phasesPanel" };
+  Object.entries(panels).forEach(([k,id]) => $(id).classList.toggle("is-hidden", k !== state.activeTab));
 
-  renderProducts(tender);
-  renderQuote(tender);
-  renderDeliveries(tender);
-  renderDocuments(tender);
-  renderPhases(tender);
+  renderProducts(t);
+  renderOrders(t);
+  renderQuote(t);
+  renderDocuments(t);
+  renderPhases(t);
   refreshIcons();
 }
 
-function renderProducts(tender) {
-  const tbody = $("productsTable");
-  tbody.replaceChildren();
-  $("newDeliveryButton").disabled = tender.products.length === 0;
+// ─── PRODUCTS ─────────────────────────────────────────────────────────────────
+function renderProducts(t) {
+  const tbody = $("productsTable"); tbody.replaceChildren();
+  if (!t.products.length) { tbody.append(emptyRow("Sin productos registrados.", 12)); return; }
 
-  if (!tender.products.length) {
-    tbody.append(emptyRow("Sin productos registrados.", 9));
-    return;
-  }
+  t.products.forEach(p => {
+    const delivered = getProductDeliveredQty(t, p.id);
+    const pct = p.quantity ? Math.min(100, (delivered / p.quantity) * 100) : 0;
+    const priceWithIva    = p.unitPrice * (1 + IVA_RATE);
+    const priceWithProfit = p.unitPrice * (1 + IVA_RATE) * (1 + (p.profitPct || 0) / 100);
+    const contractBadge   = p.contractType === "out"
+      ? `<span class="badge-out">Fuera</span>` : `<span class="badge-in">Contrato</span>`;
+    const substituteName  = p.substituteId
+      ? (t.products.find(x => x.id === p.substituteId)?.name || "?") : "";
+    const substituteNote  = p.contractType === "out" && substituteName
+      ? `<small class="sub-note">↔ ${escapeHtml(substituteName)}</small>` : "";
 
-  tender.products.forEach((product) => {
-    const delivered = getDeliveredQuantity(tender, product.id);
-    const progress = product.quantity ? Math.min(100, (delivered / product.quantity) * 100) : 0;
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>
-        <input data-product-id="${product.id}" data-product-field="name" value="${escapeAttribute(product.name)}" aria-label="Producto" />
-      </td>
-      <td>
-        <input data-product-id="${product.id}" data-product-field="sector" value="${escapeAttribute(product.sector)}" aria-label="Sector" placeholder="Sector" />
-      </td>
-      <td>
-        <span class="partida-badge">${escapeHtml(product.partida || "—")}</span>
-      </td>
-      <td>
-        <input data-product-id="${product.id}" data-product-field="unit" value="${escapeAttribute(product.unit)}" aria-label="Unidad" />
-      </td>
-      <td>
-        <input data-product-id="${product.id}" data-product-field="quantity" type="number" min="0" step="0.01" value="${product.quantity}" aria-label="Cantidad contratada" />
-      </td>
-      <td>
-        <input data-product-id="${product.id}" data-product-field="unitPrice" type="number" min="0" step="0.01" value="${product.unitPrice}" aria-label="Precio unitario" />
+      <td>${contractBadge}${substituteNote}</td>
+      <td><input data-product-id="${p.id}" data-product-field="name" value="${escapeAttr(p.name)}" /></td>
+      <td><input data-product-id="${p.id}" data-product-field="sector" value="${escapeAttr(p.sector)}" placeholder="Sector" style="min-width:90px"/></td>
+      <td><span class="partida-badge">${escapeHtml(p.partida||"—")}</span></td>
+      <td><input data-product-id="${p.id}" data-product-field="unit" value="${escapeAttr(p.unit)}" style="min-width:70px"/></td>
+      <td><input data-product-id="${p.id}" data-product-field="quantity" type="number" min="0" step="0.01" value="${p.quantity}" /></td>
+      <td><input data-product-id="${p.id}" data-product-field="unitPrice" type="number" min="0" step="0.01" value="${p.unitPrice}" /></td>
+      <td class="number-cell">${money.format(priceWithIva)}</td>
+      <td class="number-cell">
+        <input data-product-id="${p.id}" data-product-field="profitPct" type="number" min="0" step="0.1" value="${p.profitPct||0}" style="min-width:60px" />
+        <small>${money.format(priceWithProfit)}</small>
       </td>
       <td>
         <div class="progress-line">
-          <span>${number.format(delivered)} / ${number.format(product.quantity)}</span>
-          <div class="progress-track" aria-hidden="true">
-            <div class="progress-fill" style="--progress:${progress}%"></div>
-          </div>
+          <span>${number.format(delivered)} / ${number.format(p.quantity)}</span>
+          <div class="progress-track"><div class="progress-fill" style="--progress:${pct}%"></div></div>
         </div>
       </td>
-      <td class="number-cell">${money.format(getProductTotal(product))}</td>
+      <td class="number-cell">${money.format(getProductTotal(p))}</td>
       <td>
-        <button class="icon-button" type="button" data-delete-product="${product.id}" title="Eliminar producto">
-          <i data-lucide="trash-2" aria-hidden="true"></i>
+        <button class="icon-button" type="button" data-delete-product="${p.id}" title="Eliminar">
+          <i data-lucide="trash-2"></i>
         </button>
-      </td>
-    `;
+      </td>`;
     tbody.append(row);
   });
 }
 
-function renderQuote(tender) {
-  const lines = tender.quoteLines || [];
-  const subtotal = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
-  const iva = subtotal * IVA_RATE;
-  const total = subtotal + iva;
+function handleProductTableChange(e) {
+  const { productId, productField } = e.target.dataset;
+  if (!productId || !productField) return;
+  const t = getActiveTender();
+  const p = t?.products.find(x => x.id === productId);
+  if (!p) return;
+  if (["quantity","unitPrice","profitPct"].includes(productField)) {
+    p[productField] = toPositiveNumber(e.target.value);
+  } else {
+    p[productField] = e.target.value.trim();
+  }
+  saveState(); render();
+}
+
+function handleProductTableClick(e) {
+  const btn = e.target.closest("[data-delete-product]"); if (!btn) return;
+  const t = getActiveTender(); if (!t) return;
+  const p = t.products.find(x => x.id === btn.dataset.deleteProduct); if (!p) return;
+  if (!confirm(`¿Eliminar "${p.name}" y sus pedidos?`)) return;
+  t.products = t.products.filter(x => x.id !== p.id);
+  t.orders   = t.orders.filter(o => o.productId !== p.id);
+  saveState(); render();
+}
+
+// ─── ORDERS ───────────────────────────────────────────────────────────────────
+function renderOrders(t) {
+  const container = $("ordersContainer"); container.replaceChildren();
+  if (!t.products.length) {
+    container.innerHTML = `<p class="empty-row" style="padding:20px">Primero agrega productos al contrato.</p>`;
+    return;
+  }
+  if (!t.orders.length) {
+    container.innerHTML = `<p class="empty-row" style="padding:20px">Sin pedidos registrados. Crea el primero con el botón + Nuevo pedido.</p>`;
+    return;
+  }
+
+  // Group by product
+  const byProduct = {};
+  t.products.forEach(p => { byProduct[p.id] = { product: p, orders: [] }; });
+  t.orders.forEach(o => {
+    if (byProduct[o.productId]) byProduct[o.productId].orders.push(o);
+    else {
+      // product deleted — still show
+      if (!byProduct["__deleted__"]) byProduct["__deleted__"] = { product: { id:"__deleted__", name:"Producto eliminado", unit:""}, orders:[] };
+      byProduct["__deleted__"].orders.push(o);
+    }
+  });
+
+  Object.values(byProduct).filter(g => g.orders.length).forEach(({ product, orders }) => {
+    const totalOrdered   = orders.reduce((s,o) => s + o.qtyOrdered, 0);
+    const totalDelivered = orders.reduce((s,o) => s + getOrderDeliveredQty(o), 0);
+    const pct = totalOrdered ? Math.min(100, (totalDelivered / totalOrdered) * 100) : 0;
+
+    const section = document.createElement("div");
+    section.className = "order-product-section";
+    section.innerHTML = `
+      <div class="order-product-header">
+        <div>
+          <strong>${escapeHtml(product.name)}</strong>
+          <small>${escapeHtml(product.sector||"")} ${product.partida ? "· Partida: "+escapeHtml(product.partida) : ""}</small>
+        </div>
+        <div class="order-product-stats">
+          <span>${number.format(totalDelivered)} / ${number.format(totalOrdered)} ${escapeHtml(product.unit)}</span>
+          <div class="progress-track" style="width:120px"><div class="progress-fill" style="--progress:${pct}%"></div></div>
+        </div>
+      </div>
+      <div class="responsive-table">
+        <table>
+          <thead><tr>
+            <th>Pedido</th><th>Fecha</th><th>Cant. pedida</th><th>Entregado</th>
+            <th>Estatus</th><th>Solicitó</th><th>Remisiones</th><th></th>
+          </tr></thead>
+          <tbody id="orderRows_${product.id}"></tbody>
+        </table>
+      </div>`;
+    container.append(section);
+
+    const tbody = section.querySelector(`#orderRows_${product.id}`);
+    orders.forEach(o => {
+      const delivered = getOrderDeliveredQty(o);
+      const remRows = o.deliveries.map(d => {
+        const evLink = d.evidenceDriveUrl
+          ? `<a href="${escapeAttr(d.evidenceDriveUrl)}" target="_blank"><i data-lucide="external-link"></i></a>`
+          : (d.evidenceName ? `<span title="${escapeAttr(d.evidenceName)}"><i data-lucide="file-check"></i></span>` : "");
+        return `<div class="delivery-chip">${escapeHtml(d.remisionNum||d.id.slice(-6))} · ${number.format(d.qty)} · ${formatDate(d.date)} ${evLink}</div>`;
+      }).join("");
+
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td><strong>${escapeHtml(o.number)}</strong></td>
+        <td>${formatDate(o.date)}</td>
+        <td class="number-cell">${number.format(o.qtyOrdered)} ${escapeHtml(product.unit)}</td>
+        <td class="number-cell">${number.format(delivered)} ${escapeHtml(product.unit)}</td>
+        <td><span class="status-pill" data-status="${escapeHtml(o.status)}">${escapeHtml(o.status)}</span></td>
+        <td>${escapeHtml(o.requestedBy||"—")}</td>
+        <td><div class="remision-list">${remRows||"Sin remisiones"}</div></td>
+        <td>
+          <div style="display:flex;gap:6px">
+            ${o.status !== "Entregado" && o.status !== "Cancelado"
+              ? `<button class="icon-button" type="button" data-deliver-order="${o.id}" title="Registrar entrega"><i data-lucide="truck"></i></button>` : ""}
+            <button class="icon-button" type="button" data-cancel-order="${o.id}" title="Cancelar pedido" ${o.status==="Cancelado"?"disabled":""}><i data-lucide="x-circle"></i></button>
+            <button class="icon-button danger-button" type="button" data-delete-order="${o.id}" title="Eliminar pedido"><i data-lucide="trash-2"></i></button>
+          </div>
+        </td>`;
+      tbody.append(row);
+    });
+  });
+
+  // Bind order action buttons
+  container.querySelectorAll("[data-deliver-order]").forEach(btn => {
+    btn.addEventListener("click", () => openOrderDeliveryDialog(btn.dataset.deliverOrder));
+  });
+  container.querySelectorAll("[data-cancel-order]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const t = getActiveTender(); if (!t) return;
+      const o = t.orders.find(x => x.id === btn.dataset.cancelOrder); if (!o) return;
+      if (!confirm(`¿Cancelar pedido ${o.number}?`)) return;
+      o.status = "Cancelado"; saveState(); render();
+    });
+  });
+  container.querySelectorAll("[data-delete-order]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const t = getActiveTender(); if (!t) return;
+      if (!confirm("¿Eliminar este pedido?")) return;
+      t.orders = t.orders.filter(x => x.id !== btn.dataset.deleteOrder);
+      saveState(); render();
+    });
+  });
+
+  refreshIcons();
+}
+
+// ─── QUOTE ────────────────────────────────────────────────────────────────────
+function renderQuote(t) {
+  const lines = t.quoteLines || [];
+  const sub   = lines.reduce((s,l) => s + l.quantity * l.unitPrice, 0);
+  const iva   = sub * IVA_RATE;
+  const total = sub + iva;
 
   $("quoteSummary").innerHTML = `
-    <article>
-      <span>Subtotal</span>
-      <strong>${money.format(subtotal)}</strong>
-    </article>
-    <article>
-      <span>IVA</span>
-      <strong>${money.format(iva)}</strong>
-    </article>
-    <article>
-      <span>Total con IVA</span>
-      <strong>${money.format(total)}</strong>
-    </article>
-  `;
+    <article><span>Subtotal</span><strong>${money.format(sub)}</strong></article>
+    <article><span>IVA 16%</span><strong>${money.format(iva)}</strong></article>
+    <article><span>Total con IVA</span><strong>${money.format(total)}</strong></article>`;
 
-  // Render editable lines table
-  const ltbody = $("quoteLinesTable");
-  ltbody.replaceChildren();
+  // Editable lines table
+  const ltbody = $("quoteLinesTable"); ltbody.replaceChildren();
   if (!lines.length) {
     ltbody.append(emptyRow("Sin líneas. Agrega manualmente o importa de productos.", 6));
   } else {
-    lines.forEach((line) => {
-      const importe = line.quantity * line.unitPrice;
+    lines.forEach(l => {
       const row = document.createElement("tr");
       row.innerHTML = `
-        <td>${escapeHtml(line.description)}</td>
-        <td>${escapeHtml(line.unit)}</td>
-        <td class="number-cell">${number.format(line.quantity)}</td>
-        <td class="number-cell">${money.format(line.unitPrice)}</td>
-        <td class="number-cell">${money.format(importe)}</td>
-        <td>
-          <button class="icon-button" type="button" data-delete-quoteline="${line.id}" title="Eliminar línea">
-            <i data-lucide="trash-2" aria-hidden="true"></i>
-          </button>
-        </td>
-      `;
+        <td>${escapeHtml(l.description)}</td>
+        <td>${escapeHtml(l.unit)}</td>
+        <td class="number-cell">${number.format(l.quantity)}</td>
+        <td class="number-cell">${money.format(l.unitPrice)}</td>
+        <td class="number-cell">${money.format(l.quantity * l.unitPrice)}</td>
+        <td><button class="icon-button" type="button" data-delete-quoteline="${l.id}"><i data-lucide="trash-2"></i></button></td>`;
       ltbody.append(row);
     });
   }
 
-  // Quote preview
-  const quoteDate = tender.quoteCreatedAt || new Date().toISOString();
-  const quoteNumber = tender.quoteNumber || "Sin folio";
-  const rows = lines.length
-    ? lines
-        .map(
-          (line, index) => `
-        <tr>
-          <td>${index + 1}</td>
-          <td>${escapeHtml(line.description)}</td>
-          <td>${escapeHtml(line.unit)}</td>
-          <td class="number-cell">${number.format(line.quantity)}</td>
-          <td class="number-cell">${money.format(line.unitPrice)}</td>
-          <td class="number-cell">${money.format(line.quantity * line.unitPrice)}</td>
-        </tr>
-      `,
-        )
-        .join("")
+  // Preview
+  const qDate  = t.quoteCreatedAt || new Date().toISOString();
+  const qNum   = t.quoteNumber || "Sin folio";
+  const previewRows = lines.length
+    ? lines.map((l,i) => `<tr><td>${i+1}</td><td>${escapeHtml(l.description)}</td><td>${escapeHtml(l.unit)}</td>
+        <td class="number-cell">${number.format(l.quantity)}</td>
+        <td class="number-cell">${money.format(l.unitPrice)}</td>
+        <td class="number-cell">${money.format(l.quantity*l.unitPrice)}</td></tr>`).join("")
     : `<tr><td colspan="6" class="empty-row">Sin líneas registradas.</td></tr>`;
 
   $("quotePreview").innerHTML = `
     <header>
+      <div><p class="eyebrow">YLIKA DEVELOPMENT</p><h2>Cotización</h2><p class="muted">${escapeHtml(qNum)}</p></div>
       <div>
-        <p class="eyebrow">YLIKA DEVELOPMENT</p>
-        <h2>Cotización</h2>
-        <p class="muted">${escapeHtml(quoteNumber)}</p>
-      </div>
-      <div>
-        <p><strong>Fecha:</strong> ${formatDate(quoteDate)}</p>
-        <p><strong>Cliente:</strong> ${escapeHtml(tender.client)}</p>
-        <p><strong>Contrato:</strong> ${escapeHtml(tender.contract)}</p>
+        <p><strong>Fecha:</strong> ${formatDate(qDate)}</p>
+        <p><strong>Cliente:</strong> ${escapeHtml(t.client)}</p>
+        <p><strong>Contrato:</strong> ${escapeHtml(t.contract)}</p>
       </div>
     </header>
     <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Descripción</th>
-          <th>Unidad</th>
-          <th>Cantidad</th>
-          <th>Precio unitario</th>
-          <th>Importe</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
+      <thead><tr><th>#</th><th>Descripción</th><th>Unidad</th><th>Cantidad</th><th>Precio unitario</th><th>Importe</th></tr></thead>
+      <tbody>${previewRows}</tbody>
     </table>
     <div class="quote-totals">
-      <div><span>Subtotal</span><strong>${money.format(subtotal)}</strong></div>
+      <div><span>Subtotal</span><strong>${money.format(sub)}</strong></div>
       <div><span>IVA 16%</span><strong>${money.format(iva)}</strong></div>
       <div><span>Total con IVA incluido</span><strong>${money.format(total)}</strong></div>
     </div>
-    ${tender.notes ? `<p><strong>Notas:</strong> ${escapeHtml(tender.notes)}</p>` : ""}
-  `;
+    ${t.notes ? `<p><strong>Notas:</strong> ${escapeHtml(t.notes)}</p>` : ""}`;
 }
 
-function renderDeliveries(tender) {
-  const progressGrid = $("deliveryProgress");
-  const tbody = $("deliveriesTable");
-  progressGrid.replaceChildren();
-  tbody.replaceChildren();
-
-  if (!tender.products.length) {
-    progressGrid.innerHTML = `<p class="empty-row">Sin productos registrados.</p>`;
-    tbody.append(emptyRow("Sin remisiones registradas.", 7));
-    return;
+function generateQuote() {
+  const t = getActiveTender(); if (!t) return;
+  if (!t.quoteNumber) {
+    const dp = new Date().toISOString().slice(0,10).replaceAll("-","");
+    t.quoteNumber    = `COT-${dp}-${String(state.tenders.indexOf(t)+1).padStart(3,"0")}`;
+    t.quoteCreatedAt = new Date().toISOString();
   }
-
-  tender.products.forEach((product) => {
-    const delivered = getDeliveredQuantity(tender, product.id);
-    const remaining = Math.max(0, product.quantity - delivered);
-    const progress = product.quantity ? Math.min(100, (delivered / product.quantity) * 100) : 0;
-    const card = document.createElement("article");
-    card.className = "progress-card";
-    card.innerHTML = `
-      <span>${escapeHtml(product.name)}</span>
-      <strong>${number.format(delivered)} de ${number.format(product.quantity)} ${escapeHtml(product.unit)}</strong>
-      <div class="progress-track" aria-hidden="true">
-        <div class="progress-fill" style="--progress:${progress}%"></div>
-      </div>
-      <span>Restante: ${number.format(remaining)}</span>
-    `;
-    progressGrid.append(card);
-  });
-
-  if (!tender.deliveries.length) {
-    tbody.append(emptyRow("Sin remisiones registradas.", 7));
-    return;
-  }
-
-  [...tender.deliveries]
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .forEach((delivery) => {
-      const product = tender.products.find((item) => item.id === delivery.productId);
-      const evidenceHtml = delivery.evidenceName
-        ? delivery.evidenceDriveUrl
-          ? `<a href="${escapeAttribute(delivery.evidenceDriveUrl)}" target="_blank" rel="noreferrer" class="evidence-link"><i data-lucide="file-check" aria-hidden="true"></i> ${escapeHtml(delivery.evidenceName)}</a>`
-          : `<span class="evidence-local"><i data-lucide="file-check" aria-hidden="true"></i> ${escapeHtml(delivery.evidenceName)}</span>`
-        : `<span class="evidence-missing"><i data-lucide="alert-circle" aria-hidden="true"></i> Sin evidencia</span>`;
-      const row = document.createElement("tr");
-      row.innerHTML = `
-        <td><strong>${escapeHtml(delivery.number)}</strong></td>
-        <td>${formatDate(delivery.date)}</td>
-        <td>${escapeHtml(product?.name || "Producto eliminado")}</td>
-        <td class="number-cell">${number.format(delivery.quantity)}</td>
-        <td>${escapeHtml(delivery.receivedBy || "Sin dato")}</td>
-        <td>${evidenceHtml}</td>
-        <td>
-          <button class="icon-button" type="button" data-delete-delivery="${delivery.id}" title="Eliminar remisión">
-            <i data-lucide="trash-2" aria-hidden="true"></i>
-          </button>
-        </td>
-      `;
-      tbody.append(row);
-    });
+  t.quoteUpdatedAt = new Date().toISOString();
+  state.activeTab  = "quote";
+  saveState(); render();
 }
 
-function renderDocuments(tender) {
-  const tbody = $("documentsTable");
-  tbody.replaceChildren();
-  if (!tender.documents.length) {
-    tbody.append(emptyRow("Sin archivos registrados.", 5));
-    return;
-  }
-
-  [...tender.documents]
-    .sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt))
-    .forEach((documentRecord) => {
-      const link = documentRecord.driveUrl
-        ? `<a href="${escapeAttribute(documentRecord.driveUrl)}" target="_blank" rel="noreferrer">${escapeHtml(documentRecord.name)}</a>`
-        : escapeHtml(documentRecord.name);
-      const row = document.createElement("tr");
-      row.innerHTML = `
-        <td>${escapeHtml(documentRecord.type)}</td>
-        <td>${link}<br><small>${formatFileSize(documentRecord.size)}</small></td>
-        <td>${formatDate(documentRecord.uploadedAt)}</td>
-        <td>${escapeHtml(documentRecord.status)}</td>
-        <td>
-          <button class="icon-button" type="button" data-delete-document="${documentRecord.id}" title="Eliminar registro">
-            <i data-lucide="trash-2" aria-hidden="true"></i>
-          </button>
-        </td>
-      `;
-      tbody.append(row);
-    });
+function printQuote() {
+  const t = getActiveTender(); if (!t) return;
+  if (!t.quoteNumber) generateQuote();
+  window.print();
 }
 
-function renderPhases(tender) {
-  const container = $("phasesContainer");
-  container.replaceChildren();
-
-  LICITACION_PHASES.forEach((phase) => {
-    const docs = tender.phaseDocs?.[phase.id] || [];
-    const completedCount = docs.length;
-
-    const section = document.createElement("div");
-    section.className = "phase-block";
-
-    const phaseStatusClass = completedCount > 0 ? "phase-has-docs" : "phase-empty";
-
-    section.innerHTML = `
-      <div class="phase-header ${phaseStatusClass}">
-        <div class="phase-icon" style="--phase-color:${phase.color}">
-          <i data-lucide="${phase.icon}" aria-hidden="true"></i>
-        </div>
-        <div class="phase-info">
-          <strong>${escapeHtml(phase.name)}</strong>
-          <p>${escapeHtml(phase.description)}</p>
-        </div>
-        <div class="phase-actions">
-          <span class="phase-doc-count ${completedCount > 0 ? 'has-docs' : ''}">${completedCount} doc${completedCount !== 1 ? "s" : ""}</span>
-          <button class="secondary-action phase-upload-btn" type="button"
-            data-phase-id="${phase.id}"
-            data-phase-name="${escapeAttribute(phase.name)}">
-            <i data-lucide="upload" aria-hidden="true"></i>
-            Subir
-          </button>
-        </div>
-      </div>
-    `;
-
-    if (docs.length) {
-      const docList = document.createElement("div");
-      docList.className = "phase-doc-list";
-      docs.forEach((doc) => {
-        const item = document.createElement("div");
-        item.className = "phase-doc-item";
-        const link = doc.driveUrl
-          ? `<a href="${escapeAttribute(doc.driveUrl)}" target="_blank" rel="noreferrer">${escapeHtml(doc.name)}</a>`
-          : `<span>${escapeHtml(doc.name)}</span>`;
-        item.innerHTML = `
-          <i data-lucide="file-text" aria-hidden="true"></i>
-          <div>
-            ${link}
-            <small>${formatDate(doc.uploadedAt)} · ${formatFileSize(doc.size)} · ${escapeHtml(doc.status)}</small>
-          </div>
-          <button class="icon-button" type="button"
-            data-delete-phase-doc="${doc.id}"
-            data-phase-id="${phase.id}"
-            title="Eliminar">
-            <i data-lucide="trash-2" aria-hidden="true"></i>
-          </button>
-        `;
-        docList.append(item);
-      });
-      section.append(docList);
-    }
-
-    container.append(section);
+function importProductsToQuote() {
+  const t = getActiveTender();
+  if (!t?.products.length) { alert("No hay productos para importar."); return; }
+  if (!confirm("¿Agregar todos los productos como líneas de cotización? (No borra líneas existentes)")) return;
+  t.products.forEach(p => {
+    t.quoteLines.push(normalizeQuoteLine({ description: p.name, unit: p.unit, quantity: p.quantity, unitPrice: p.unitPrice }));
   });
-
-  // Bind upload buttons
-  container.querySelectorAll(".phase-upload-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      openPhaseUploadDialog(btn.dataset.phaseId, btn.dataset.phaseName);
-    });
-  });
-
-  // Bind delete buttons
-  container.querySelectorAll("[data-delete-phase-doc]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const docId = btn.dataset.deletePhaseDoc;
-      const phaseId = btn.dataset.phaseId;
-      deletePhaseDoc(phaseId, docId);
-    });
-  });
-
-  refreshIcons();
+  saveState(); renderQuote(t);
 }
 
-function renderUsers() {
-  const tbody = $("usersTable");
-  if (!tbody) return;
-  tbody.replaceChildren();
-
-  state.users.forEach((user) => {
+// ─── DOCUMENTS ────────────────────────────────────────────────────────────────
+function renderDocuments(t) {
+  const tbody = $("documentsTable"); tbody.replaceChildren();
+  if (!t.documents.length) { tbody.append(emptyRow("Sin archivos registrados.", 5)); return; }
+  [...t.documents].sort((a,b) => new Date(b.uploadedAt)-new Date(a.uploadedAt)).forEach(d => {
+    const link = d.driveUrl
+      ? `<a href="${escapeAttr(d.driveUrl)}" target="_blank" rel="noreferrer">${escapeHtml(d.name)}</a>`
+      : escapeHtml(d.name);
     const row = document.createElement("tr");
-    const protectedText = user.protected ? "Protegido" : "Activo";
-    const action = user.protected
-      ? `<span class="muted">Admin base</span>`
-      : `<button class="icon-button" type="button" data-delete-user="${user.id}" title="Dar de baja usuario">
-          <i data-lucide="user-minus" aria-hidden="true"></i>
-        </button>`;
     row.innerHTML = `
-      <td><strong>${escapeHtml(user.username)}</strong></td>
-      <td>${escapeHtml(user.name)}</td>
-      <td>${escapeHtml(user.role)}</td>
-      <td>${protectedText}</td>
-      <td>${action}</td>
-    `;
+      <td>${escapeHtml(d.type)}</td>
+      <td>${link}<br><small>${formatFileSize(d.size)}</small></td>
+      <td>${formatDate(d.uploadedAt)}</td>
+      <td>${escapeHtml(d.status)}</td>
+      <td><button class="icon-button" type="button" data-delete-document="${d.id}"><i data-lucide="trash-2"></i></button></td>`;
     tbody.append(row);
   });
 }
 
-// ─── DIALOGS ─────────────────────────────────────────────────────────────────
+function handleDocumentTableClick(e) {
+  const btn = e.target.closest("[data-delete-document]"); if (!btn) return;
+  const t = getActiveTender(); if (!t) return;
+  if (!confirm("¿Eliminar este registro?")) return;
+  t.documents = t.documents.filter(x => x.id !== btn.dataset.deleteDocument);
+  saveState(); render();
+}
 
-function openTenderDialog(tender = null) {
-  $("tenderDialogTitle").textContent = tender ? "Editar licitación" : "Nueva licitación";
-  $("tenderIdInput").value = tender?.id || "";
-  $("tenderNameInput").value = tender?.name || "";
-  $("clientInput").value = tender?.client || "";
-  $("contractInput").value = tender?.contract || "";
-  $("deadlineInput").value = tender?.deadline || "";
-  $("notesInput").value = tender?.notes || "";
+// ─── PHASES ───────────────────────────────────────────────────────────────────
+function renderPhases(t) {
+  const container = $("phasesContainer"); container.replaceChildren();
+  LICITACION_PHASES.forEach(ph => {
+    const docs = t.phaseDocs?.[ph.id] || [];
+    const sect = document.createElement("div");
+    sect.className = "phase-block";
+    sect.innerHTML = `
+      <div class="phase-header ${docs.length ? 'phase-has-docs' : ''}">
+        <div class="phase-icon" style="--phase-color:${ph.color}"><i data-lucide="${ph.icon}"></i></div>
+        <div class="phase-info"><strong>${escapeHtml(ph.name)}</strong><p>${escapeHtml(ph.desc)}</p></div>
+        <div class="phase-actions">
+          <span class="phase-doc-count ${docs.length?'has-docs':''}">${docs.length} doc${docs.length!==1?"s":""}</span>
+          <button class="secondary-action phase-upload-btn" type="button"
+            data-phase-id="${ph.id}" data-phase-name="${escapeAttr(ph.name)}">
+            <i data-lucide="upload"></i> Subir
+          </button>
+        </div>
+      </div>`;
+
+    if (docs.length) {
+      const dl = document.createElement("div"); dl.className = "phase-doc-list";
+      docs.forEach(d => {
+        const item = document.createElement("div"); item.className = "phase-doc-item";
+        const link = d.driveUrl
+          ? `<a href="${escapeAttr(d.driveUrl)}" target="_blank">${escapeHtml(d.name)}</a>`
+          : `<span>${escapeHtml(d.name)}</span>`;
+        item.innerHTML = `
+          <i data-lucide="file-text"></i>
+          <div>${link}<small>${formatDate(d.uploadedAt)} · ${formatFileSize(d.size)} · ${escapeHtml(d.status)}</small></div>
+          <button class="icon-button" type="button" data-delete-phase-doc="${d.id}" data-phase-id="${ph.id}"><i data-lucide="trash-2"></i></button>`;
+        dl.append(item);
+      });
+      sect.append(dl);
+    }
+    container.append(sect);
+  });
+
+  container.querySelectorAll(".phase-upload-btn").forEach(btn => {
+    btn.addEventListener("click", () => openPhaseUploadDialog(btn.dataset.phaseId, btn.dataset.phaseName));
+  });
+  container.querySelectorAll("[data-delete-phase-doc]").forEach(btn => {
+    btn.addEventListener("click", () => deletePhaseDoc(btn.dataset.phaseId, btn.dataset.deletePhaseDoc));
+  });
+  refreshIcons();
+}
+
+function deletePhaseDoc(phaseId, docId) {
+  const t = getActiveTender(); if (!t) return;
+  if (!confirm("¿Eliminar este documento?")) return;
+  t.phaseDocs[phaseId] = (t.phaseDocs[phaseId]||[]).filter(d => d.id !== docId);
+  saveState(); renderPhases(t); refreshIcons();
+}
+
+// ─── USERS ────────────────────────────────────────────────────────────────────
+function renderUsers() {
+  const tbody = $("usersTable"); if (!tbody) return;
+  tbody.replaceChildren();
+  state.users.forEach(u => {
+    const row = document.createElement("tr");
+    const action = u.protected ? `<span class="muted">Admin base</span>`
+      : `<button class="icon-button" type="button" data-delete-user="${u.id}"><i data-lucide="user-minus"></i></button>`;
+    row.innerHTML = `
+      <td><strong>${escapeHtml(u.username)}</strong></td>
+      <td>${escapeHtml(u.name)}</td>
+      <td>${escapeHtml(u.role)}</td>
+      <td>${u.protected ? "Protegido" : "Activo"}</td>
+      <td>${action}</td>`;
+    tbody.append(row);
+  });
+}
+
+function handleUsersTableClick(e) {
+  const btn = e.target.closest("[data-delete-user]"); if (!btn || !getCurrentUser()?.isAdmin) return;
+  const u = state.users.find(x => x.id === btn.dataset.deleteUser);
+  if (!u || u.protected) return;
+  if (!confirm(`¿Dar de baja "${u.username}"?`)) return;
+  state.users = state.users.filter(x => x.id !== u.id);
+  if (sessionStorage.getItem(SESSION_KEY) === u.username) sessionStorage.removeItem(SESSION_KEY);
+  saveState(); renderUsers(); refreshIcons();
+}
+
+// ─── DIALOGS ─────────────────────────────────────────────────────────────────
+function openDialog(id)  { const d = $(id); d.showModal ? d.showModal() : d.setAttribute("open",""); refreshIcons(); }
+function closeDialog(id) { const d = $(id); d.close    ? d.close()     : d.removeAttribute("open"); }
+
+function openTenderDialog(t = null) {
+  $("tenderDialogTitle").textContent = t ? "Editar licitación" : "Nueva licitación";
+  $("tenderIdInput").value    = t?.id       || "";
+  $("tenderNameInput").value  = t?.name     || "";
+  $("clientInput").value      = t?.client   || "";
+  $("contractInput").value    = t?.contract || "";
+  $("deadlineInput").value    = t?.deadline || "";
+  $("notesInput").value       = t?.notes    || "";
   openDialog("tenderDialog");
 }
 
-function openProductDialog() {
-  if (!getActiveTender()) return;
-  $("productForm").reset();
-  $("unitInput").value = "pieza";
+function openProductDialog(productToEdit = null) {
+  const t = getActiveTender(); if (!t) return;
+  $("productDialogTitle").textContent = productToEdit ? "Editar producto" : "Agregar producto";
+  $("productIdInput").value      = productToEdit?.id         || "";
+  $("productNameInput").value    = productToEdit?.name       || "";
+  $("unitInput").value           = productToEdit?.unit       || "pieza";
+  $("sectorInput").value         = productToEdit?.sector     || "";
+  $("partidaInput").value        = productToEdit?.partida    || "";
+  $("quantityInput").value       = productToEdit?.quantity   || "";
+  $("priceInput").value          = productToEdit?.unitPrice  || "";
+  $("profitInput").value         = productToEdit?.profitPct  || "0";
+
+  const isOut = productToEdit?.contractType === "out";
+  $("contractTypeIn").checked  = !isOut;
+  $("contractTypeOut").checked = isOut;
+  $("substituteRow").classList.toggle("is-hidden", !isOut);
+
+  // Populate substitute dropdown (other products)
+  const sel = $("substituteProductInput");
+  sel.replaceChildren();
+  sel.innerHTML = `<option value="">— Selecciona la partida que libera uso —</option>`;
+  t.products.filter(p => !productToEdit || p.id !== productToEdit.id).forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p.id;
+    opt.textContent = `${p.name} (Partida: ${p.partida||"—"})`;
+    if (productToEdit?.substituteId === p.id) opt.selected = true;
+    sel.append(opt);
+  });
+
+  updatePriceCalc();
   openDialog("productDialog");
 }
 
-function openDeliveryDialog() {
-  const tender = getActiveTender();
-  if (!tender || !tender.products.length) return;
-  const select = $("deliveryProductInput");
-  select.replaceChildren();
-  tender.products.forEach((product) => {
-    const option = document.createElement("option");
-    option.value = product.id;
-    option.textContent = `${product.name} (${number.format(getRemainingQuantity(tender, product.id))} restante)`;
-    select.append(option);
+function updatePriceCalc() {
+  const base   = toPositiveNumber($("priceInput").value);
+  const profit = toPositiveNumber($("profitInput").value);
+  $("calcWithIva").textContent    = money.format(base * (1 + IVA_RATE));
+  $("calcWithProfit").textContent = money.format(base * (1 + IVA_RATE) * (1 + profit / 100));
+}
+
+function openOrderDialog() {
+  const t = getActiveTender();
+  if (!t || !t.products.length) { alert("Primero agrega productos al contrato."); return; }
+  $("orderIdInput").value = "";
+  $("orderForm").reset();
+  $("orderDateInput").value = today();
+  $("orderEvidenceError").textContent = "";
+
+  const sel = $("orderProductInput"); sel.replaceChildren();
+  t.products.forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p.id;
+    opt.textContent = `${p.name} | Partida: ${p.partida||"—"} | ${number.format(p.quantity)} ${p.unit}`;
+    sel.append(opt);
   });
-  $("deliveryForm").reset();
-  $("deliveryDateInput").value = today();
-  $("evidenceError").textContent = "";
-  openDialog("deliveryDialog");
+  openDialog("orderDialog");
+}
+
+function openOrderDeliveryDialog(orderId) {
+  const t = getActiveTender(); if (!t) return;
+  const o = t.orders.find(x => x.id === orderId); if (!o) return;
+  $("odOrderIdInput").value = orderId;
+  $("orderDeliveryForm").reset();
+  $("odOrderIdInput").value = orderId;
+  $("odDateInput").value = today();
+  $("odEvidenceError").textContent = "";
+  openDialog("orderDeliveryDialog");
+}
+
+function openQuoteLineDialog(line = null) {
+  $("quoteLineDialogTitle").textContent = line ? "Editar línea" : "Agregar línea";
+  $("quoteLineIdInput").value    = line?.id          || "";
+  $("quoteLineDescInput").value  = line?.description || "";
+  $("quoteLineUnitInput").value  = line?.unit        || "pieza";
+  $("quoteLineQtyInput").value   = line?.quantity    || "";
+  $("quoteLinePriceInput").value = line?.unitPrice   || "";
+  openDialog("quoteLineDialog");
+}
+
+function openPhaseUploadDialog(phaseId, phaseName) {
+  $("phaseIdInput").value          = phaseId;
+  $("phaseUploadTitle").textContent= `Subir doc: ${phaseName}`;
+  $("phaseUploadForm").reset();
+  $("phaseIdInput").value          = phaseId;
+  $("phaseUploadStatus").textContent = "";
+  openDialog("phaseUploadDialog");
 }
 
 function openUsersDialog() {
@@ -868,617 +940,250 @@ function openUsersDialog() {
   openDialog("usersDialog");
 }
 
-function openQuoteLineDialog(line = null) {
-  $("quoteLineDialogTitle").textContent = line ? "Editar línea" : "Agregar línea";
-  $("quoteLineIdInput").value = line?.id || "";
-  $("quoteLineDescInput").value = line?.description || "";
-  $("quoteLineUnitInput").value = line?.unit || "pieza";
-  $("quoteLineQtyInput").value = line?.quantity || "";
-  $("quoteLinePriceInput").value = line?.unitPrice || "";
-  openDialog("quoteLineDialog");
-}
-
-function openPhaseUploadDialog(phaseId, phaseName) {
-  $("phaseIdInput").value = phaseId;
-  $("phaseUploadTitle").textContent = `Subir doc: ${phaseName}`;
-  $("phaseUploadForm").reset();
-  $("phaseIdInput").value = phaseId;
-  $("phaseUploadStatus").textContent = "";
-  openDialog("phaseUploadDialog");
-}
-
-function openDialog(id) {
-  const dialog = $(id);
-  if (dialog.showModal) {
-    dialog.showModal();
-  } else {
-    dialog.setAttribute("open", "");
-  }
-  refreshIcons();
-}
-
-function closeDialog(id) {
-  const dialog = $(id);
-  if (dialog.close) {
-    dialog.close();
-  } else {
-    dialog.removeAttribute("open");
-  }
-}
-
 // ─── FORM HANDLERS ───────────────────────────────────────────────────────────
-
-function handleTenderSubmit(event) {
-  event.preventDefault();
+function handleTenderSubmit(e) {
+  e.preventDefault();
   const id = $("tenderIdInput").value;
   const payload = {
-    name: $("tenderNameInput").value.trim(),
-    client: $("clientInput").value.trim(),
-    contract: $("contractInput").value.trim(),
-    deadline: $("deadlineInput").value,
+    name: $("tenderNameInput").value.trim(), client: $("clientInput").value.trim(),
+    contract: $("contractInput").value.trim(), deadline: $("deadlineInput").value,
     notes: $("notesInput").value.trim(),
   };
   if (!payload.name || !payload.client || !payload.contract) return;
+  if (id) {
+    const t = state.tenders.find(x => x.id === id); if (t) Object.assign(t, payload);
+  } else {
+    const t = normalizeTender({ ...payload, id: createId("lic"), createdAt: new Date().toISOString(), status: "Activa" });
+    state.tenders.unshift(t); state.activeTenderId = t.id;
+  }
+  saveState(); closeDialog("tenderDialog"); render();
+}
+
+function handleProductSubmit(e) {
+  e.preventDefault();
+  const t = getActiveTender(); if (!t) return;
+  const id           = $("productIdInput").value;
+  const contractType = $("contractTypeOut").checked ? "out" : "in";
+  const substituteId = contractType === "out" ? $("substituteProductInput").value : "";
+
+  const payload = normalizeProduct({
+    id:           id || createId("prd"),
+    name:         $("productNameInput").value.trim(),
+    unit:         $("unitInput").value.trim() || "pieza",
+    sector:       $("sectorInput").value.trim(),
+    partida:      $("partidaInput").value.trim(),
+    quantity:     toPositiveNumber($("quantityInput").value),
+    unitPrice:    toPositiveNumber($("priceInput").value),
+    profitPct:    toPositiveNumber($("profitInput").value),
+    contractType,
+    substituteId,
+  });
 
   if (id) {
-    const tender = state.tenders.find((item) => item.id === id);
-    if (tender) Object.assign(tender, payload);
+    const idx = t.products.findIndex(p => p.id === id);
+    if (idx >= 0) t.products[idx] = payload;
   } else {
-    const tender = normalizeTender({
-      ...payload,
-      id: createId("lic"),
-      createdAt: new Date().toISOString(),
-      status: "Activa",
-    });
-    state.tenders.unshift(tender);
-    state.activeTenderId = tender.id;
+    t.products.push(payload);
   }
-  saveState();
-  closeDialog("tenderDialog");
-  render();
+  saveState(); closeDialog("productDialog"); state.activeTab = "products"; render();
 }
 
-function handleProductSubmit(event) {
-  event.preventDefault();
-  const tender = getActiveTender();
-  if (!tender) return;
-  tender.products.push(
-    normalizeProduct({
-      id: createId("prd"),
-      name: $("productNameInput").value.trim(),
-      unit: $("unitInput").value.trim() || "pieza",
-      sector: $("sectorInput").value.trim(),
-      partida: $("partidaInput").value.trim(),
-      quantity: toPositiveNumber($("quantityInput").value),
-      unitPrice: toPositiveNumber($("priceInput").value),
-    }),
-  );
-  saveState();
-  closeDialog("productDialog");
-  state.activeTab = "products";
-  render();
-}
+async function handleOrderSubmit(e) {
+  e.preventDefault();
+  const t = getActiveTender(); if (!t) return;
+  const productId   = $("orderProductInput").value;
+  const qtyOrdered  = toPositiveNumber($("orderQtyInput").value);
+  if (!productId || qtyOrdered <= 0) return;
 
-async function handleDeliverySubmit(event) {
-  event.preventDefault();
-  const tender = getActiveTender();
-  if (!tender) return;
-
-  const productId = $("deliveryProductInput").value;
-  const product = tender.products.find((item) => item.id === productId);
-  const quantity = toPositiveNumber($("deliveryQuantityInput").value);
-  if (!product || quantity <= 0) return;
-
-  const remaining = getRemainingQuantity(tender, productId);
-  if (quantity > remaining) {
-    alert(`La cantidad excede el restante contratado: ${number.format(remaining)}.`);
-    return;
-  }
-
-  // Validate evidence file
-  const evidenceFile = $("deliveryEvidenceFile").files[0];
-  if (!evidenceFile) {
-    $("evidenceError").textContent = "Debes adjuntar un PDF o imagen como evidencia de la entrega.";
-    return;
-  }
-  const allowedTypes = ["application/pdf", "image/"];
-  const isAllowed = allowedTypes.some((t) => evidenceFile.type.startsWith(t));
-  if (!isAllowed) {
-    $("evidenceError").textContent = "Solo se permiten archivos PDF o imágenes (JPG, PNG, WEBP, etc.).";
-    return;
-  }
-  $("evidenceError").textContent = "";
-
-  const nextNumber = tender.deliveries.length + 1;
-  const delivery = normalizeDelivery({
-    id: createId("rem"),
-    number: `REM-${String(nextNumber).padStart(4, "0")}`,
+  const nextNum = t.orders.length + 1;
+  const order = normalizeOrder({
+    id:          createId("ord"),
+    number:      `PED-${String(nextNum).padStart(4,"0")}`,
     productId,
-    quantity,
-    date: $("deliveryDateInput").value || today(),
-    receivedBy: $("receivedByInput").value.trim(),
-    notes: $("deliveryNotesInput").value.trim(),
-    evidenceName: evidenceFile.name,
-    evidenceSize: evidenceFile.size,
-    evidenceMime: evidenceFile.type,
-    evidenceStatus: "Subiendo",
-    createdAt: new Date().toISOString(),
+    qtyOrdered,
+    date:        $("orderDateInput").value || today(),
+    eta:         $("orderEtaInput").value || "",
+    requestedBy: $("orderRequestedByInput").value.trim(),
+    notes:       $("orderNotesInput").value.trim(),
+    status:      "Pendiente",
+    createdAt:   new Date().toISOString(),
   });
-  tender.deliveries.push(delivery);
+  t.orders.push(order);
   saveState();
-  closeDialog("deliveryDialog");
-  state.activeTab = "deliveries";
+  closeDialog("orderDialog");
+  state.activeTab = "orders";
   render();
 
-  // Upload evidence in background
-  try {
-    const url = await uploadToDrive(evidenceFile, {
-      type: "Evidencia-Remisión",
-      name: evidenceFile.name,
-      uploadedAt: delivery.createdAt,
-    }, tender);
-    delivery.evidenceDriveUrl = url || "";
-    delivery.evidenceStatus = "Enviado a Drive";
-    saveState();
-    renderDeliveries(tender);
-    refreshIcons();
-  } catch {
-    delivery.evidenceStatus = "Error al subir";
-    saveState();
-    renderDeliveries(tender);
-    refreshIcons();
+  // Optional evidence on creation
+  const evFile = $("orderEvidenceFile").files[0];
+  if (evFile) {
+    uploadOrderEvidence(evFile, order, t, null);
   }
 }
 
-async function handleUploadSubmit(event) {
-  event.preventDefault();
-  const tender = getActiveTender();
-  const file = $("documentFile").files[0];
-  if (!tender || !file) return;
+async function handleOrderDeliverySubmit(e) {
+  e.preventDefault();
+  const t = getActiveTender(); if (!t) return;
+  const orderId = $("odOrderIdInput").value;
+  const order   = t.orders.find(x => x.id === orderId); if (!order) return;
 
-  const documentRecord = normalizeDocument({
-    id: createId("doc"),
-    type: $("documentType").value,
-    name: file.name,
-    mime: file.type || "application/octet-stream",
-    size: file.size,
-    status: "Subiendo",
-    uploadedAt: new Date().toISOString(),
+  const evFile = $("odEvidenceFile").files[0];
+  if (!evFile) { $("odEvidenceError").textContent = "Debes adjuntar PDF o imagen de la remisión."; return; }
+  const ok = evFile.type.startsWith("image/") || evFile.type === "application/pdf";
+  if (!ok) { $("odEvidenceError").textContent = "Solo se permiten PDF o imágenes."; return; }
+  $("odEvidenceError").textContent = "";
+
+  const qty  = toPositiveNumber($("odQtyInput").value);
+  if (qty <= 0) return;
+
+  const delivery = normalizeOrderDelivery({
+    id:          createId("od"),
+    qty,
+    date:        $("odDateInput").value || today(),
+    receivedBy:  $("odReceivedByInput").value.trim(),
+    remisionNum: $("odRemisionInput").value.trim(),
+    notes:       $("odNotesInput").value.trim(),
+    evidenceName:   evFile.name,
+    evidenceSize:   evFile.size,
+    evidenceMime:   evFile.type,
+    evidenceStatus: "Subiendo",
+    createdAt:   new Date().toISOString(),
   });
-  tender.documents.unshift(documentRecord);
+
+  order.deliveries.push(delivery);
+  const totalDel = getOrderDeliveredQty(order);
+  order.qtyDelivered = totalDel;
+  if (totalDel >= order.qtyOrdered) order.status = "Entregado";
+  else if (totalDel > 0)            order.status = "Parcial";
+
   saveState();
-  renderDocuments(tender);
-  $("uploadStatus").textContent = "Subiendo archivo a Google Drive...";
+  closeDialog("orderDeliveryDialog");
+  render();
+
+  uploadOrderEvidence(evFile, order, t, delivery);
+}
+
+async function uploadOrderEvidence(file, order, tender, delivery) {
+  try {
+    await uploadToDrive(file, { type: "Remisión-Pedido", name: file.name, uploadedAt: new Date().toISOString() }, tender);
+    if (delivery) { delivery.evidenceStatus = "Enviado a Drive"; saveState(); renderOrders(tender); refreshIcons(); }
+  } catch {
+    if (delivery) { delivery.evidenceStatus = "Error al subir"; saveState(); renderOrders(tender); refreshIcons(); }
+  }
+}
+
+async function handleUploadSubmit(e) {
+  e.preventDefault();
+  const t = getActiveTender();
+  const file = $("documentFile").files[0];
+  if (!t || !file) return;
+
+  const doc = normalizeDocument({
+    id: createId("doc"), type: $("documentType").value,
+    name: file.name, mime: file.type || "application/octet-stream",
+    size: file.size, status: "Subiendo", uploadedAt: new Date().toISOString(),
+  });
+  t.documents.unshift(doc);
+  saveState(); renderDocuments(t);
+  $("uploadStatus").textContent = "Subiendo a Google Drive...";
 
   try {
-    await uploadToDrive(file, documentRecord, tender);
-    documentRecord.status = "Enviado a Drive";
-    $("uploadStatus").textContent = "Solicitud enviada correctamente a Google Drive.";
+    await uploadToDrive(file, doc, t);
+    doc.status = "Enviado a Drive";
+    $("uploadStatus").textContent = "✓ Archivo enviado a Google Drive.";
     $("uploadForm").reset();
-  } catch (error) {
-    documentRecord.status = "Error al subir";
-    $("uploadStatus").textContent = "No se pudo completar la subida. Revisa el endpoint de Drive.";
-    console.error(error);
+  } catch (err) {
+    doc.status = "Error al subir";
+    $("uploadStatus").textContent = "✗ Error al subir. Revisa el endpoint.";
+    console.error(err);
   }
-  saveState();
-  renderDocuments(tender);
-  refreshIcons();
+  saveState(); renderDocuments(t); refreshIcons();
 }
 
-function handleUserSubmit(event) {
-  event.preventDefault();
-  if (!getCurrentUser()?.isAdmin) return;
+async function handlePhaseUploadSubmit(e) {
+  e.preventDefault();
+  const t       = getActiveTender();
+  const phaseId = $("phaseIdInput").value;
+  const file    = $("phaseDocFile").files[0];
+  const docName = $("phaseDocNameInput").value.trim();
+  if (!t || !phaseId || !file || !docName) return;
 
-  const username = $("newUsernameInput").value.trim().toLowerCase();
-  const password = $("newUserPasswordInput").value;
-  const name = $("newUserNameInput").value.trim();
-  const role = $("newUserRoleInput").value;
-  const error = $("userFormError");
-  error.textContent = "";
+  if (!t.phaseDocs) t.phaseDocs = {};
+  if (!Array.isArray(t.phaseDocs[phaseId])) t.phaseDocs[phaseId] = [];
 
-  if (!username || !password || !name) {
-    error.textContent = "Completa nombre, usuario y contraseña.";
-    return;
-  }
-  if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
-    error.textContent = "El usuario debe tener 3 a 32 caracteres: letras, números, punto, guion o guion bajo.";
-    return;
-  }
-  if (password.length < 6) {
-    error.textContent = "La contraseña debe tener al menos 6 caracteres.";
-    return;
-  }
-  const exists = state.users.some((user) => user.username.toLowerCase() === username);
-  if (exists) {
-    error.textContent = "Ese usuario ya existe.";
-    return;
-  }
-
-  state.users.push(
-    normalizeUser({
-      id: createId("usr"),
-      username,
-      password,
-      name,
-      role,
-      isAdmin: false,
-      protected: false,
-      createdAt: new Date().toISOString(),
-    }),
-  );
+  const doc = normalizePhaseDoc({
+    id: createId("phd"), name: docName,
+    mime: file.type || "application/octet-stream",
+    size: file.size, status: "Subiendo", uploadedAt: new Date().toISOString(),
+  });
+  t.phaseDocs[phaseId].push(doc);
   saveState();
-  $("userForm").reset();
-  renderUsers();
-  refreshIcons();
+  $("phaseUploadStatus").textContent = "Subiendo a Google Drive...";
+  renderPhases(t);
+
+  try {
+    await uploadToDrive(file, { type: `Fase-${phaseId}`, name: docName, uploadedAt: doc.uploadedAt }, t);
+    doc.status = "Enviado a Drive";
+    $("phaseUploadStatus").textContent = "✓ Documento enviado.";
+    saveState();
+    setTimeout(() => { closeDialog("phaseUploadDialog"); renderPhases(t); refreshIcons(); }, 1000);
+  } catch (err) {
+    doc.status = "Error al subir";
+    $("phaseUploadStatus").textContent = "✗ Error al subir. Revisa el endpoint.";
+    saveState(); renderPhases(t); refreshIcons();
+    console.error(err);
+  }
 }
 
-function handleQuoteLineSubmit(event) {
-  event.preventDefault();
-  const tender = getActiveTender();
-  if (!tender) return;
+function handleQuoteLineSubmit(e) {
+  e.preventDefault();
+  const t = getActiveTender(); if (!t) return;
   const id = $("quoteLineIdInput").value;
   const payload = {
     description: $("quoteLineDescInput").value.trim(),
-    unit: $("quoteLineUnitInput").value.trim() || "pieza",
-    quantity: toPositiveNumber($("quoteLineQtyInput").value),
-    unitPrice: toPositiveNumber($("quoteLinePriceInput").value),
+    unit:        $("quoteLineUnitInput").value.trim() || "pieza",
+    quantity:    toPositiveNumber($("quoteLineQtyInput").value),
+    unitPrice:   toPositiveNumber($("quoteLinePriceInput").value),
   };
   if (!payload.description || payload.quantity <= 0) return;
   if (id) {
-    const line = tender.quoteLines.find((l) => l.id === id);
-    if (line) Object.assign(line, payload);
+    const l = t.quoteLines.find(x => x.id === id); if (l) Object.assign(l, payload);
   } else {
-    tender.quoteLines.push(normalizeQuoteLine({ id: createId("ql"), ...payload }));
+    t.quoteLines.push(normalizeQuoteLine({ id: createId("ql"), ...payload }));
   }
-  saveState();
-  closeDialog("quoteLineDialog");
-  renderQuote(tender);
+  saveState(); closeDialog("quoteLineDialog"); renderQuote(t);
 }
 
-async function handlePhaseUploadSubmit(event) {
-  event.preventDefault();
-  const tender = getActiveTender();
-  const phaseId = $("phaseIdInput").value;
-  const file = $("phaseDocFile").files[0];
-  const docName = $("phaseDocNameInput").value.trim();
-  if (!tender || !phaseId || !file || !docName) return;
-
-  if (!tender.phaseDocs) tender.phaseDocs = {};
-  if (!Array.isArray(tender.phaseDocs[phaseId])) tender.phaseDocs[phaseId] = [];
-
-  const doc = normalizePhaseDoc({
-    id: createId("phd"),
-    name: docName,
-    mime: file.type || "application/octet-stream",
-    size: file.size,
-    status: "Subiendo",
-    uploadedAt: new Date().toISOString(),
-  });
-  tender.phaseDocs[phaseId].push(doc);
-  saveState();
-  $("phaseUploadStatus").textContent = "Subiendo a Google Drive...";
-  renderPhases(tender);
-
-  try {
-    await uploadToDrive(file, { type: `Fase-${phaseId}`, name: docName, uploadedAt: doc.uploadedAt }, tender);
-    doc.status = "Enviado a Drive";
-    $("phaseUploadStatus").textContent = "Documento enviado correctamente.";
-  } catch {
-    doc.status = "Error al subir";
-    $("phaseUploadStatus").textContent = "Error al subir. Revisa el endpoint.";
-  }
-  saveState();
-  setTimeout(() => {
-    closeDialog("phaseUploadDialog");
-    renderPhases(tender);
-    refreshIcons();
-  }, 1200);
+function handleQuoteLineTableClick(e) {
+  const btn = e.target.closest("[data-delete-quoteline]"); if (!btn) return;
+  const t = getActiveTender(); if (!t) return;
+  if (!confirm("¿Eliminar esta línea?")) return;
+  t.quoteLines = t.quoteLines.filter(l => l.id !== btn.dataset.deleteQuoteline);
+  saveState(); renderQuote(t);
 }
 
-function importProductsToQuote() {
-  const tender = getActiveTender();
-  if (!tender || !tender.products.length) {
-    alert("No hay productos para importar.");
-    return;
-  }
-  const confirmed = confirm("¿Importar todos los productos actuales como líneas de cotización? Esto agregará líneas nuevas sin borrar las existentes.");
-  if (!confirmed) return;
-  tender.products.forEach((product) => {
-    tender.quoteLines.push(normalizeQuoteLine({
-      id: createId("ql"),
-      description: product.name,
-      unit: product.unit,
-      quantity: product.quantity,
-      unitPrice: product.unitPrice,
-    }));
-  });
-  saveState();
-  renderQuote(tender);
-}
+function handleUserSubmit(e) {
+  e.preventDefault();
+  if (!getCurrentUser()?.isAdmin) return;
+  const username = $("newUsernameInput").value.trim().toLowerCase();
+  const password = $("newUserPasswordInput").value;
+  const name     = $("newUserNameInput").value.trim();
+  const role     = $("newUserRoleInput").value;
+  const err      = $("userFormError"); err.textContent = "";
 
-// ─── TABLE CLICK HANDLERS ────────────────────────────────────────────────────
+  if (!username || !password || !name) { err.textContent = "Completa todos los campos."; return; }
+  if (!/^[a-z0-9._-]{3,32}$/.test(username)) { err.textContent = "Usuario: 3-32 chars, solo letras, números, punto, guion."; return; }
+  if (password.length < 6) { err.textContent = "Contraseña mínimo 6 caracteres."; return; }
+  if (state.users.some(u => u.username === username)) { err.textContent = "Ese usuario ya existe."; return; }
 
-function handleProductTableChange(event) {
-  const { productId, productField } = event.target.dataset;
-  if (!productId || !productField) return;
-  const tender = getActiveTender();
-  const product = tender?.products.find((item) => item.id === productId);
-  if (!product) return;
-  if (["quantity", "unitPrice"].includes(productField)) {
-    product[productField] = toPositiveNumber(event.target.value);
-  } else {
-    product[productField] = event.target.value.trim();
-  }
-  saveState();
-  render();
-}
-
-function handleProductTableClick(event) {
-  const button = event.target.closest("[data-delete-product]");
-  if (!button) return;
-  const tender = getActiveTender();
-  if (!tender) return;
-  const productId = button.dataset.deleteProduct;
-  const product = tender.products.find((item) => item.id === productId);
-  if (!product) return;
-  const confirmed = confirm(`¿Eliminar "${product.name}" y sus remisiones?`);
-  if (!confirmed) return;
-  tender.products = tender.products.filter((item) => item.id !== productId);
-  tender.deliveries = tender.deliveries.filter((item) => item.productId !== productId);
-  saveState();
-  render();
-}
-
-function handleDeliveryTableClick(event) {
-  const button = event.target.closest("[data-delete-delivery]");
-  if (!button) return;
-  const tender = getActiveTender();
-  if (!tender) return;
-  const delivery = tender.deliveries.find((item) => item.id === button.dataset.deleteDelivery);
-  if (!delivery) return;
-  const confirmed = confirm(`¿Eliminar la remisión ${delivery.number}?`);
-  if (!confirmed) return;
-  tender.deliveries = tender.deliveries.filter((item) => item.id !== delivery.id);
-  saveState();
-  render();
-}
-
-function handleDocumentTableClick(event) {
-  const button = event.target.closest("[data-delete-document]");
-  if (!button) return;
-  const tender = getActiveTender();
-  if (!tender) return;
-  const confirmed = confirm("¿Eliminar este registro de archivo del panel?");
-  if (!confirmed) return;
-  tender.documents = tender.documents.filter((item) => item.id !== button.dataset.deleteDocument);
-  saveState();
-  render();
-}
-
-function handleQuoteLineTableClick(event) {
-  const button = event.target.closest("[data-delete-quoteline]");
-  if (!button) return;
-  const tender = getActiveTender();
-  if (!tender) return;
-  const confirmed = confirm("¿Eliminar esta línea de cotización?");
-  if (!confirmed) return;
-  tender.quoteLines = tender.quoteLines.filter((l) => l.id !== button.dataset.deleteQuoteline);
-  saveState();
-  renderQuote(tender);
-}
-
-function handleUsersTableClick(event) {
-  const button = event.target.closest("[data-delete-user]");
-  if (!button || !getCurrentUser()?.isAdmin) return;
-  const user = state.users.find((item) => item.id === button.dataset.deleteUser);
-  if (!user || user.protected) return;
-  const confirmed = confirm(`¿Dar de baja al usuario "${user.username}"?`);
-  if (!confirmed) return;
-  state.users = state.users.filter((item) => item.id !== user.id);
-  if (sessionStorage.getItem(SESSION_KEY) === user.username) {
-    sessionStorage.removeItem(SESSION_KEY);
-  }
-  saveState();
-  renderUsers();
-  refreshIcons();
-}
-
-function handleStatusChange(event) {
-  const tender = getActiveTender();
-  if (!tender) return;
-  tender.status = event.target.value;
-  saveState();
-  render();
+  state.users.push(normalizeUser({ id: createId("usr"), username, password, name, role, isAdmin:false, protected:false, createdAt:new Date().toISOString() }));
+  saveState(); $("userForm").reset(); renderUsers(); refreshIcons();
 }
 
 function deleteActiveTender() {
-  const tender = getActiveTender();
-  if (!tender) return;
-  const confirmed = confirm(`¿Eliminar la licitación "${tender.name}"?`);
-  if (!confirmed) return;
-  state.tenders = state.tenders.filter((item) => item.id !== tender.id);
+  const t = getActiveTender(); if (!t) return;
+  if (!confirm(`¿Eliminar la licitación "${t.name}"?`)) return;
+  state.tenders = state.tenders.filter(x => x.id !== t.id);
   state.activeTenderId = state.tenders[0]?.id || null;
-  saveState();
-  render();
-}
-
-function deletePhaseDoc(phaseId, docId) {
-  const tender = getActiveTender();
-  if (!tender || !tender.phaseDocs?.[phaseId]) return;
-  const confirmed = confirm("¿Eliminar este documento de la fase?");
-  if (!confirmed) return;
-  tender.phaseDocs[phaseId] = tender.phaseDocs[phaseId].filter((d) => d.id !== docId);
-  saveState();
-  renderPhases(tender);
-  refreshIcons();
-}
-
-// ─── QUOTE ───────────────────────────────────────────────────────────────────
-
-function generateQuote() {
-  const tender = getActiveTender();
-  if (!tender) return;
-  if (!tender.quoteNumber) {
-    const datePart = new Date().toISOString().slice(0, 10).replaceAll("-", "");
-    tender.quoteNumber = `COT-${datePart}-${String(state.tenders.indexOf(tender) + 1).padStart(3, "0")}`;
-    tender.quoteCreatedAt = new Date().toISOString();
-  }
-  tender.quoteUpdatedAt = new Date().toISOString();
-  state.activeTab = "quote";
-  saveState();
-  render();
-}
-
-function printQuote() {
-  const tender = getActiveTender();
-  if (!tender) return;
-  if (!tender.quoteNumber) generateQuote();
-  window.print();
-}
-
-// ─── DRIVE UPLOAD ─────────────────────────────────────────────────────────────
-// Se envía como JSON con base64, porque fetch con mode:"no-cors" + FormData
-// no retorna respuesta útil y a veces falla el Content-Type. El Apps Script
-// debe leer e.postData.contents (JSON) en lugar de e.parameter.
-
-async function uploadToDrive(file, documentRecord, tender) {
-  const dataUrl = await readFileAsDataUrl(file);
-  const base64Data = dataUrl.split(",")[1] || "";
-
-  const payload = {
-    fileName: file.name,
-    mimeType: file.type || "application/octet-stream",
-    fileBase64: base64Data,
-    documentType: documentRecord.type,
-    tenderId: tender.id,
-    tenderName: tender.name,
-    contract: tender.contract,
-    client: tender.client,
-    uploadedAt: documentRecord.uploadedAt,
-  };
-
-  // NOTE: Con mode:"no-cors" NO podemos leer la respuesta.
-  // El script debe manejar el JSON parseando e.postData.contents.
-  // Si tu script ya usa e.parameter, cambia a JSON.parse(e.postData.contents).
-  await fetch(DRIVE_ENDPOINT, {
-    method: "POST",
-    mode: "no-cors",
-    headers: {
-      "Content-Type": "text/plain", // no-cors no permite application/json
-    },
-    body: JSON.stringify(payload),
-  });
-
-  // Con no-cors no podemos leer la URL de respuesta; retornamos vacío.
-  return "";
-}
-
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-
-function getActiveTender() {
-  return state.tenders.find((tender) => tender.id === state.activeTenderId) || null;
-}
-
-function getCurrentUser() {
-  const username = sessionStorage.getItem(SESSION_KEY);
-  if (!username) return null;
-  return state.users.find((user) => user.username === username) || null;
-}
-
-function getFinancials(tender) {
-  const subtotal = tender.products.reduce(
-    (sum, product) => sum + product.quantity * product.unitPrice,
-    0,
-  );
-  const iva = subtotal * IVA_RATE;
-  return {
-    subtotal,
-    iva,
-    total: subtotal + iva,
-  };
-}
-
-function getProductTotal(product) {
-  return product.quantity * product.unitPrice * (1 + IVA_RATE);
-}
-
-function getDeliveredQuantity(tender, productId) {
-  return tender.deliveries
-    .filter((delivery) => delivery.productId === productId)
-    .reduce((sum, delivery) => sum + delivery.quantity, 0);
-}
-
-function getRemainingQuantity(tender, productId) {
-  const product = tender.products.find((item) => item.id === productId);
-  if (!product) return 0;
-  return Math.max(0, product.quantity - getDeliveredQuantity(tender, productId));
-}
-
-function createId(prefix) {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function toPositiveNumber(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-}
-
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function formatDate(value) {
-  if (!value) return "Sin fecha";
-  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  const date = dateOnly
-    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
-    : new Date(value);
-  if (Number.isNaN(date.getTime())) return "Sin fecha";
-  return dateFormatter.format(date);
-}
-
-function formatFileSize(bytes) {
-  if (!bytes) return "0 KB";
-  const units = ["B", "KB", "MB", "GB"];
-  let size = bytes;
-  let unitIndex = 0;
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-  return `${number.format(size)} ${units[unitIndex]}`;
-}
-
-function readFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
-function emptyRow(text, colspan) {
-  const row = document.createElement("tr");
-  row.innerHTML = `<td colspan="${colspan}" class="empty-row">${escapeHtml(text)}</td>`;
-  return row;
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function escapeAttribute(value) {
-  return escapeHtml(value).replaceAll("`", "&#096;");
-}
-
-function refreshIcons() {
-  if (window.lucide) {
-    window.lucide.createIcons();
-  }
+  saveState(); render();
 }
