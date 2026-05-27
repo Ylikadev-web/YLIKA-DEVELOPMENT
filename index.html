@@ -9,96 +9,54 @@
     <script src="app.js" defer></script>
   </head>
   <body>
+    <!-- LOGIN -->
     <main id="loginScreen" class="login-shell">
       <section class="login-panel" aria-labelledby="loginTitle">
         <div class="brand-mark">YL</div>
         <p class="eyebrow">Administración privada</p>
         <h1 id="loginTitle">YLIKA Licitaciones</h1>
         <form id="loginForm" class="stacked-form" autocomplete="off">
-          <label>
-            Usuario
-            <input id="usernameInput" name="username" type="text" placeholder="admin" required />
-          </label>
-          <label>
-            Contraseña
-            <input id="passwordInput" name="password" type="password" required />
-          </label>
+          <label>Usuario<input id="usernameInput" name="username" type="text" placeholder="admin" required /></label>
+          <label>Contraseña<input id="passwordInput" name="password" type="password" required /></label>
           <p id="loginError" class="form-error" role="alert"></p>
-          <button class="primary-action" type="submit">
-            <i data-lucide="log-in" aria-hidden="true"></i>
-            Iniciar sesión
-          </button>
+          <button class="primary-action" type="submit"><i data-lucide="log-in"></i> Iniciar sesión</button>
         </form>
       </section>
     </main>
 
+    <!-- APP -->
     <div id="appShell" class="app-shell is-hidden">
       <header class="topbar">
-        <div>
-          <p class="eyebrow">Panel administrativo</p>
-          <h1>YLIKA Licitaciones</h1>
-        </div>
+        <div><p class="eyebrow">Panel administrativo</p><h1>YLIKA Licitaciones</h1></div>
         <div class="topbar-actions">
-          <button id="usersButton" class="ghost-button" type="button" title="Administrar usuarios">
-            <i data-lucide="users" aria-hidden="true"></i>
-            Usuarios
-          </button>
-          <span class="session-chip">
-            <i data-lucide="shield-check" aria-hidden="true"></i>
-            <span id="currentUserLabel">Admin</span>
-          </span>
-          <button id="logoutButton" class="ghost-button" type="button" title="Cerrar sesión">
-            <i data-lucide="log-out" aria-hidden="true"></i>
-            Salir
-          </button>
+          <button id="usersButton" class="ghost-button" type="button"><i data-lucide="users"></i> Usuarios</button>
+          <span class="session-chip"><i data-lucide="shield-check"></i><span id="currentUserLabel">Admin</span></span>
+          <button id="logoutButton" class="ghost-button" type="button"><i data-lucide="log-out"></i> Salir</button>
         </div>
       </header>
 
-      <section class="metric-strip" aria-label="Resumen">
-        <article>
-          <span>Licitaciones</span>
-          <strong id="totalTenders">0</strong>
-        </article>
-        <article>
-          <span>Contratado</span>
-          <strong id="contractedTotal">$0.00</strong>
-        </article>
-        <article>
-          <span>Entregado</span>
-          <strong id="deliveredTotal">0%</strong>
-        </article>
-        <article>
-          <span>Documentos</span>
-          <strong id="documentTotal">0</strong>
-        </article>
+      <section class="metric-strip">
+        <article><span>Licitaciones</span><strong id="totalTenders">0</strong></article>
+        <article><span>Contratado</span><strong id="contractedTotal">$0.00</strong></article>
+        <article><span>Entregado</span><strong id="deliveredTotal">0%</strong></article>
+        <article><span>Documentos</span><strong id="documentTotal">0</strong></article>
       </section>
 
       <div class="workspace">
-        <aside class="tender-sidebar" aria-label="Licitaciones">
+        <aside class="tender-sidebar">
           <div class="section-heading">
-            <div>
-              <p class="eyebrow">Control</p>
-              <h2>Licitaciones</h2>
-            </div>
-            <button id="newTenderButton" class="icon-button" type="button" title="Nueva licitación">
-              <i data-lucide="plus" aria-hidden="true"></i>
-            </button>
+            <div><p class="eyebrow">Control</p><h2>Licitaciones</h2></div>
+            <button id="newTenderButton" class="icon-button" type="button" title="Nueva licitación"><i data-lucide="plus"></i></button>
           </div>
-          <label class="search-box">
-            <i data-lucide="search" aria-hidden="true"></i>
-            <input id="searchInput" type="search" placeholder="Buscar" />
-          </label>
+          <label class="search-box"><i data-lucide="search"></i><input id="searchInput" type="search" placeholder="Buscar" /></label>
           <div id="tenderList" class="tender-list"></div>
         </aside>
 
         <section id="emptyState" class="empty-state">
-          <i data-lucide="folder-plus" aria-hidden="true"></i>
+          <i data-lucide="folder-plus"></i>
           <h2>Crea la primera licitación</h2>
           <p>No hay licitaciones registradas.</p>
-          <button class="primary-action" type="button" data-open-tender>
-            <i data-lucide="plus" aria-hidden="true"></i>
-            Nueva licitación
-          </button>
+          <button class="primary-action" type="button" data-open-tender><i data-lucide="plus"></i> Nueva licitación</button>
         </section>
 
         <section id="detailView" class="detail-view is-hidden" aria-live="polite">
@@ -115,64 +73,33 @@
                 <option value="Adjudicada">Adjudicada</option>
                 <option value="Cerrada">Cerrada</option>
               </select>
-              <button id="editTenderButton" class="ghost-button" type="button" title="Editar licitación">
-                <i data-lucide="pencil" aria-hidden="true"></i>
-                Editar
-              </button>
-              <button id="deleteTenderButton" class="danger-button" type="button" title="Eliminar licitación">
-                <i data-lucide="trash-2" aria-hidden="true"></i>
-              </button>
+              <button id="editTenderButton" class="ghost-button" type="button"><i data-lucide="pencil"></i> Editar</button>
+              <button id="deleteTenderButton" class="danger-button" type="button"><i data-lucide="trash-2"></i></button>
             </div>
           </div>
 
-          <nav class="tabs" aria-label="Secciones">
-            <button class="tab-button is-active" type="button" data-tab="products">
-              <i data-lucide="boxes" aria-hidden="true"></i>
-              Productos
-            </button>
-            <button class="tab-button" type="button" data-tab="quote">
-              <i data-lucide="calculator" aria-hidden="true"></i>
-              Cotización
-            </button>
-            <button class="tab-button" type="button" data-tab="deliveries">
-              <i data-lucide="truck" aria-hidden="true"></i>
-              Entregas
-            </button>
-            <button class="tab-button" type="button" data-tab="documents">
-              <i data-lucide="paperclip" aria-hidden="true"></i>
-              Archivos
-            </button>
-            <button class="tab-button" type="button" data-tab="phases">
-              <i data-lucide="landmark" aria-hidden="true"></i>
-              Documentación
-            </button>
+          <nav class="tabs">
+            <button class="tab-button is-active" type="button" data-tab="products"><i data-lucide="boxes"></i> Productos</button>
+            <button class="tab-button" type="button" data-tab="orders"><i data-lucide="shopping-cart"></i> Pedidos</button>
+            <button class="tab-button" type="button" data-tab="quote"><i data-lucide="calculator"></i> Cotización</button>
+            <button class="tab-button" type="button" data-tab="documents"><i data-lucide="paperclip"></i> Archivos</button>
+            <button class="tab-button" type="button" data-tab="phases"><i data-lucide="landmark"></i> Documentación</button>
           </nav>
 
-          <!-- PRODUCTOS -->
+          <!-- TAB: PRODUCTOS -->
           <section id="productsPanel" class="tab-panel">
             <div class="section-heading">
-              <div>
-                <p class="eyebrow">Contrato</p>
-                <h3>Productos</h3>
-              </div>
-              <button id="newProductButton" class="secondary-action" type="button">
-                <i data-lucide="plus" aria-hidden="true"></i>
-                Producto
-              </button>
+              <div><p class="eyebrow">Contrato</p><h3>Productos</h3></div>
+              <button id="newProductButton" class="secondary-action" type="button"><i data-lucide="plus"></i> Producto</button>
             </div>
             <div class="responsive-table">
               <table>
                 <thead>
                   <tr>
-                    <th>Producto</th>
-                    <th>Sector</th>
-                    <th>Partida</th>
-                    <th>Unidad</th>
-                    <th>Cantidad</th>
-                    <th>Precio unitario</th>
-                    <th>Entregado</th>
-                    <th>Total con IVA</th>
-                    <th></th>
+                    <th>Tipo</th><th>Producto</th><th>Sector</th><th>Partida</th>
+                    <th>Unidad</th><th>Cantidad</th><th>P. Unit. s/IVA</th>
+                    <th>P. Unit. c/IVA</th><th>% Ganancia</th><th>Entregado</th>
+                    <th>Total c/IVA</th><th></th>
                   </tr>
                 </thead>
                 <tbody id="productsTable"></tbody>
@@ -180,94 +107,43 @@
             </div>
           </section>
 
-          <!-- COTIZACIÓN (independiente) -->
+          <!-- TAB: PEDIDOS -->
+          <section id="ordersPanel" class="tab-panel is-hidden">
+            <div class="section-heading">
+              <div><p class="eyebrow">Gestión</p><h3>Pedidos</h3></div>
+              <button id="newOrderButton" class="secondary-action" type="button"><i data-lucide="plus"></i> Nuevo pedido</button>
+            </div>
+            <div id="ordersContainer"></div>
+          </section>
+
+          <!-- TAB: COTIZACIÓN -->
           <section id="quotePanel" class="tab-panel is-hidden">
             <div class="section-heading">
-              <div>
-                <p class="eyebrow">IVA 16%</p>
-                <h3>Cotización</h3>
-              </div>
+              <div><p class="eyebrow">IVA 16%</p><h3>Cotización</h3></div>
               <div class="button-row">
-                <button id="importProductsButton" class="ghost-button" type="button">
-                  <i data-lucide="download" aria-hidden="true"></i>
-                  Importar de productos
-                </button>
-                <button id="addQuoteLineButton" class="secondary-action" type="button">
-                  <i data-lucide="plus" aria-hidden="true"></i>
-                  Agregar línea
-                </button>
-                <button id="generateQuoteButton" class="secondary-action" type="button">
-                  <i data-lucide="file-plus-2" aria-hidden="true"></i>
-                  Generar
-                </button>
-                <button id="printQuoteButton" class="ghost-button" type="button">
-                  <i data-lucide="printer" aria-hidden="true"></i>
-                  Imprimir
-                </button>
+                <button id="importProductsButton" class="ghost-button" type="button"><i data-lucide="download"></i> Importar productos</button>
+                <button id="addQuoteLineButton" class="secondary-action" type="button"><i data-lucide="plus"></i> Agregar línea</button>
+                <button id="generateQuoteButton" class="secondary-action" type="button"><i data-lucide="file-plus-2"></i> Generar</button>
+                <button id="printQuoteButton" class="ghost-button" type="button"><i data-lucide="printer"></i> Imprimir</button>
               </div>
             </div>
             <div id="quoteSummary" class="quote-summary"></div>
-            <!-- Tabla editable de líneas de cotización -->
             <div class="responsive-table" style="margin-bottom:14px">
               <table>
-                <thead>
-                  <tr>
-                    <th>Descripción</th>
-                    <th>Unidad</th>
-                    <th>Cantidad</th>
-                    <th>Precio unitario</th>
-                    <th>Importe</th>
-                    <th></th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Descripción</th><th>Unidad</th><th>Cantidad</th><th>P. Unit.</th><th>Importe</th><th></th></tr></thead>
                 <tbody id="quoteLinesTable"></tbody>
               </table>
             </div>
             <article id="quotePreview" class="quote-preview"></article>
           </section>
 
-          <!-- ENTREGAS -->
-          <section id="deliveriesPanel" class="tab-panel is-hidden">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">Actualización</p>
-                <h3>Entregas y remisiones</h3>
-              </div>
-              <button id="newDeliveryButton" class="secondary-action" type="button">
-                <i data-lucide="clipboard-plus" aria-hidden="true"></i>
-                Remisión
-              </button>
-            </div>
-            <div id="deliveryProgress" class="progress-grid"></div>
-            <div class="responsive-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Remisión</th>
-                    <th>Fecha</th>
-                    <th>Producto</th>
-                    <th>Cantidad</th>
-                    <th>Recibió</th>
-                    <th>Evidencia</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="deliveriesTable"></tbody>
-              </table>
-            </div>
-          </section>
-
-          <!-- ARCHIVOS -->
+          <!-- TAB: ARCHIVOS -->
           <section id="documentsPanel" class="tab-panel is-hidden">
             <div class="section-heading">
-              <div>
-                <p class="eyebrow">Google Drive</p>
-                <h3>Archivos</h3>
-              </div>
+              <div><p class="eyebrow">Google Drive</p><h3>Archivos</h3></div>
             </div>
             <form id="uploadForm" class="upload-form">
-              <label>
-                Tipo
+              <label>Tipo
                 <select id="documentType" required>
                   <option value="Factura">Factura</option>
                   <option value="Remisión">Remisión</option>
@@ -277,44 +153,24 @@
                   <option value="Otro">Otro</option>
                 </select>
               </label>
-              <label>
-                Archivo
-                <input
-                  id="documentFile"
-                  type="file"
-                  accept=".pdf,.xls,.xlsx,.xml,.doc,.docx,.csv,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,image/*"
-                  required
-                />
+              <label>Archivo
+                <input id="documentFile" type="file" accept=".pdf,.xls,.xlsx,.xml,.doc,.docx,.csv,.png,.jpg,.jpeg,.webp,.gif,image/*" required />
               </label>
-              <button class="primary-action" type="submit">
-                <i data-lucide="upload-cloud" aria-hidden="true"></i>
-                Subir
-              </button>
+              <button class="primary-action" type="submit"><i data-lucide="upload-cloud"></i> Subir</button>
             </form>
             <p id="uploadStatus" class="upload-status" role="status"></p>
             <div class="responsive-table">
               <table>
-                <thead>
-                  <tr>
-                    <th>Tipo</th>
-                    <th>Archivo</th>
-                    <th>Fecha</th>
-                    <th>Estatus</th>
-                    <th></th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Tipo</th><th>Archivo</th><th>Fecha</th><th>Estatus</th><th></th></tr></thead>
                 <tbody id="documentsTable"></tbody>
               </table>
             </div>
           </section>
 
-          <!-- DOCUMENTACIÓN DE FASES -->
+          <!-- TAB: DOCUMENTACIÓN (FASES) -->
           <section id="phasesPanel" class="tab-panel is-hidden">
             <div class="section-heading">
-              <div>
-                <p class="eyebrow">Proceso de licitación</p>
-                <h3>Documentación por fase</h3>
-              </div>
+              <div><p class="eyebrow">Proceso licitatorio</p><h3>Documentación por fase</h3></div>
             </div>
             <div id="phasesContainer" class="phases-container"></div>
           </section>
@@ -322,244 +178,209 @@
       </div>
     </div>
 
-    <!-- DIALOG: Nueva licitación -->
+    <!-- ═══════════ DIALOGS ═══════════ -->
+
+    <!-- Nueva licitación -->
     <dialog id="tenderDialog">
-      <form id="tenderForm" method="dialog" class="dialog-form">
+      <form id="tenderForm" class="dialog-form">
         <div class="dialog-header">
           <h2 id="tenderDialogTitle">Nueva licitación</h2>
-          <button class="icon-button" type="button" data-close-dialog="tenderDialog" title="Cerrar">
-            <i data-lucide="x" aria-hidden="true"></i>
-          </button>
+          <button class="icon-button" type="button" data-close-dialog="tenderDialog"><i data-lucide="x"></i></button>
         </div>
         <input id="tenderIdInput" type="hidden" />
         <div class="form-grid">
-          <label>
-            Nombre de licitación
-            <input id="tenderNameInput" type="text" required />
-          </label>
-          <label>
-            Cliente / dependencia
-            <input id="clientInput" type="text" required />
-          </label>
-          <label>
-            Número de contrato
-            <input id="contractInput" type="text" required />
-          </label>
-          <label>
-            Fecha límite
-            <input id="deadlineInput" type="date" />
-          </label>
+          <label>Nombre de licitación<input id="tenderNameInput" type="text" required /></label>
+          <label>Cliente / dependencia<input id="clientInput" type="text" required /></label>
+          <label>Número de contrato<input id="contractInput" type="text" required /></label>
+          <label>Fecha límite<input id="deadlineInput" type="date" /></label>
         </div>
-        <label>
-          Notas
-          <textarea id="notesInput" rows="3"></textarea>
-        </label>
+        <label>Notas<textarea id="notesInput" rows="3"></textarea></label>
         <div class="dialog-actions">
           <button class="ghost-button" type="button" data-close-dialog="tenderDialog">Cancelar</button>
-          <button class="primary-action" type="submit">
-            <i data-lucide="save" aria-hidden="true"></i>
-            Guardar
-          </button>
+          <button class="primary-action" type="submit"><i data-lucide="save"></i> Guardar</button>
         </div>
       </form>
     </dialog>
 
-    <!-- DIALOG: Agregar producto (con sector y partida) -->
+    <!-- Agregar producto (con sector, partida, IVA calc, % ganancia, fuera de contrato) -->
     <dialog id="productDialog">
-      <form id="productForm" method="dialog" class="dialog-form">
+      <form id="productForm" class="dialog-form">
         <div class="dialog-header">
-          <h2>Agregar producto</h2>
-          <button class="icon-button" type="button" data-close-dialog="productDialog" title="Cerrar">
-            <i data-lucide="x" aria-hidden="true"></i>
-          </button>
+          <h2 id="productDialogTitle">Agregar producto</h2>
+          <button class="icon-button" type="button" data-close-dialog="productDialog"><i data-lucide="x"></i></button>
         </div>
+        <input id="productIdInput" type="hidden" />
+
+        <!-- Tipo de contrato -->
+        <div class="contract-type-toggle">
+          <label class="toggle-option">
+            <input type="radio" name="contractType" id="contractTypeIn" value="in" checked />
+            <span><i data-lucide="check-circle"></i> Dentro de contrato</span>
+          </label>
+          <label class="toggle-option">
+            <input type="radio" name="contractType" id="contractTypeOut" value="out" />
+            <span><i data-lucide="arrow-left-right"></i> Fuera de contrato</span>
+          </label>
+        </div>
+
+        <!-- Partida sustituida (solo fuera de contrato) -->
+        <div id="substituteRow" class="substitute-row is-hidden">
+          <label style="grid-column:1/-1">
+            Sustituye a (partida del contrato)
+            <select id="substituteProductInput">
+              <option value="">— Selecciona la partida que libera uso —</option>
+            </select>
+          </label>
+        </div>
+
         <div class="form-grid">
-          <label>
-            Producto
-            <input id="productNameInput" type="text" required />
-          </label>
-          <label>
-            Unidad
-            <input id="unitInput" type="text" value="pieza" required />
-          </label>
-          <label>
-            Sector
-            <input id="sectorInput" type="text" placeholder="Ej. Salud, Educación, Infraestructura" required />
-          </label>
-          <label>
-            Partida
-            <input id="partidaInput" type="text" placeholder="Ej. 2531, 2541, 5151" required />
-          </label>
-          <label>
-            Cantidad contratada
-            <input id="quantityInput" type="number" min="0" step="0.01" required />
-          </label>
-          <label>
-            Precio unitario sin IVA
+          <label>Producto / descripción<input id="productNameInput" type="text" required /></label>
+          <label>Unidad<input id="unitInput" type="text" value="pieza" required /></label>
+          <label>Sector<input id="sectorInput" type="text" placeholder="Ej. Salud, Infraestructura" /></label>
+          <label>Partida presupuestal<input id="partidaInput" type="text" placeholder="Ej. 2531, 5151" /></label>
+          <label>Cantidad contratada<input id="quantityInput" type="number" min="0" step="0.01" required /></label>
+          <label>Precio unit. sin IVA
             <input id="priceInput" type="number" min="0" step="0.01" required />
           </label>
+          <label>% Ganancia<input id="profitInput" type="number" min="0" step="0.1" value="0" placeholder="Ej. 15" /></label>
+          <label>— Calculados —
+            <div class="calc-row">
+              <span>c/IVA: <strong id="calcWithIva">$0.00</strong></span>
+              <span>c/ganancia: <strong id="calcWithProfit">$0.00</strong></span>
+            </div>
+          </label>
         </div>
+
         <div class="dialog-actions">
           <button class="ghost-button" type="button" data-close-dialog="productDialog">Cancelar</button>
-          <button class="primary-action" type="submit">
-            <i data-lucide="save" aria-hidden="true"></i>
-            Guardar
-          </button>
+          <button class="primary-action" type="submit"><i data-lucide="save"></i> Guardar</button>
         </div>
       </form>
     </dialog>
 
-    <!-- DIALOG: Nueva remisión (con evidencia obligatoria) -->
-    <dialog id="deliveryDialog">
-      <form id="deliveryForm" method="dialog" class="dialog-form">
+    <!-- Nuevo pedido -->
+    <dialog id="orderDialog">
+      <form id="orderForm" class="dialog-form">
         <div class="dialog-header">
-          <h2>Nueva remisión</h2>
-          <button class="icon-button" type="button" data-close-dialog="deliveryDialog" title="Cerrar">
-            <i data-lucide="x" aria-hidden="true"></i>
-          </button>
+          <h2>Nuevo pedido</h2>
+          <button class="icon-button" type="button" data-close-dialog="orderDialog"><i data-lucide="x"></i></button>
         </div>
+        <input id="orderIdInput" type="hidden" />
         <div class="form-grid">
-          <label>
-            Producto
-            <select id="deliveryProductInput" required></select>
+          <label>Producto
+            <select id="orderProductInput" required></select>
           </label>
-          <label>
-            Cantidad entregada
-            <input id="deliveryQuantityInput" type="number" min="0" step="0.01" required />
+          <label>Cantidad pedida
+            <input id="orderQtyInput" type="number" min="0.01" step="0.01" required />
           </label>
-          <label>
-            Fecha
-            <input id="deliveryDateInput" type="date" required />
+          <label>Fecha pedido
+            <input id="orderDateInput" type="date" required />
           </label>
-          <label>
-            Recibió
-            <input id="receivedByInput" type="text" />
+          <label>Fecha entrega estimada
+            <input id="orderEtaInput" type="date" />
+          </label>
+          <label style="grid-column:1/-1">Solicitó / proveedor
+            <input id="orderRequestedByInput" type="text" />
           </label>
         </div>
-        <label>
-          Observaciones
-          <textarea id="deliveryNotesInput" rows="2"></textarea>
-        </label>
+        <label>Observaciones<textarea id="orderNotesInput" rows="2"></textarea></label>
+
+        <!-- Subir remisión opcional al crear -->
         <label class="evidence-label">
-          <span class="evidence-required-badge"><i data-lucide="shield-alert" aria-hidden="true"></i> Evidencia obligatoria</span>
-          Adjunta PDF o imagen de la remisión / evidencia de entrega
-          <input
-            id="deliveryEvidenceFile"
-            type="file"
-            accept=".pdf,image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff"
-            required
-          />
-          <p id="evidenceError" class="form-error"></p>
+          <span class="evidence-required-badge"><i data-lucide="file-text"></i> Remisión / evidencia</span>
+          Adjunta PDF o imagen de la remisión (opcional al crear; obligatorio al marcar entregado)
+          <input id="orderEvidenceFile" type="file" accept=".pdf,image/*,.png,.jpg,.jpeg,.webp" />
         </label>
+        <p id="orderEvidenceError" class="form-error"></p>
+
         <div class="dialog-actions">
-          <button class="ghost-button" type="button" data-close-dialog="deliveryDialog">Cancelar</button>
-          <button class="primary-action" type="submit">
-            <i data-lucide="save" aria-hidden="true"></i>
-            Guardar remisión
-          </button>
+          <button class="ghost-button" type="button" data-close-dialog="orderDialog">Cancelar</button>
+          <button class="primary-action" type="submit"><i data-lucide="save"></i> Guardar pedido</button>
         </div>
       </form>
     </dialog>
 
-    <!-- DIALOG: Agregar línea a cotización -->
+    <!-- Marcar entrega de pedido -->
+    <dialog id="orderDeliveryDialog">
+      <form id="orderDeliveryForm" class="dialog-form">
+        <div class="dialog-header">
+          <h2>Registrar entrega de pedido</h2>
+          <button class="icon-button" type="button" data-close-dialog="orderDeliveryDialog"><i data-lucide="x"></i></button>
+        </div>
+        <input id="odOrderIdInput" type="hidden" />
+        <div class="form-grid">
+          <label>Cantidad entregada<input id="odQtyInput" type="number" min="0.01" step="0.01" required /></label>
+          <label>Fecha entrega<input id="odDateInput" type="date" required /></label>
+          <label>Recibió<input id="odReceivedByInput" type="text" /></label>
+          <label>N° remisión<input id="odRemisionInput" type="text" placeholder="REM-0001" /></label>
+        </div>
+        <label class="evidence-label">
+          <span class="evidence-required-badge"><i data-lucide="shield-alert"></i> Evidencia obligatoria</span>
+          PDF o imagen de la remisión
+          <input id="odEvidenceFile" type="file" accept=".pdf,image/*,.png,.jpg,.jpeg,.webp" required />
+        </label>
+        <p id="odEvidenceError" class="form-error"></p>
+        <label>Notas<textarea id="odNotesInput" rows="2"></textarea></label>
+        <div class="dialog-actions">
+          <button class="ghost-button" type="button" data-close-dialog="orderDeliveryDialog">Cancelar</button>
+          <button class="primary-action" type="submit"><i data-lucide="truck"></i> Registrar entrega</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Agregar línea cotización -->
     <dialog id="quoteLineDialog">
-      <form id="quoteLineForm" method="dialog" class="dialog-form">
+      <form id="quoteLineForm" class="dialog-form">
         <div class="dialog-header">
           <h2 id="quoteLineDialogTitle">Agregar línea</h2>
-          <button class="icon-button" type="button" data-close-dialog="quoteLineDialog" title="Cerrar">
-            <i data-lucide="x" aria-hidden="true"></i>
-          </button>
+          <button class="icon-button" type="button" data-close-dialog="quoteLineDialog"><i data-lucide="x"></i></button>
         </div>
         <input id="quoteLineIdInput" type="hidden" />
         <div class="form-grid">
-          <label style="grid-column:1/-1">
-            Descripción
-            <input id="quoteLineDescInput" type="text" required />
-          </label>
-          <label>
-            Unidad
-            <input id="quoteLineUnitInput" type="text" value="pieza" required />
-          </label>
-          <label>
-            Cantidad
-            <input id="quoteLineQtyInput" type="number" min="0" step="0.01" required />
-          </label>
-          <label style="grid-column:1/-1">
-            Precio unitario sin IVA
-            <input id="quoteLinePriceInput" type="number" min="0" step="0.01" required />
-          </label>
+          <label style="grid-column:1/-1">Descripción<input id="quoteLineDescInput" type="text" required /></label>
+          <label>Unidad<input id="quoteLineUnitInput" type="text" value="pieza" required /></label>
+          <label>Cantidad<input id="quoteLineQtyInput" type="number" min="0" step="0.01" required /></label>
+          <label style="grid-column:1/-1">Precio unitario sin IVA<input id="quoteLinePriceInput" type="number" min="0" step="0.01" required /></label>
         </div>
         <div class="dialog-actions">
           <button class="ghost-button" type="button" data-close-dialog="quoteLineDialog">Cancelar</button>
-          <button class="primary-action" type="submit">
-            <i data-lucide="save" aria-hidden="true"></i>
-            Guardar
-          </button>
+          <button class="primary-action" type="submit"><i data-lucide="save"></i> Guardar</button>
         </div>
       </form>
     </dialog>
 
-    <!-- DIALOG: Subir documento de fase -->
+    <!-- Subir doc de fase -->
     <dialog id="phaseUploadDialog">
-      <form id="phaseUploadForm" method="dialog" class="dialog-form">
+      <form id="phaseUploadForm" class="dialog-form">
         <div class="dialog-header">
           <h2 id="phaseUploadTitle">Subir documento</h2>
-          <button class="icon-button" type="button" data-close-dialog="phaseUploadDialog" title="Cerrar">
-            <i data-lucide="x" aria-hidden="true"></i>
-          </button>
+          <button class="icon-button" type="button" data-close-dialog="phaseUploadDialog"><i data-lucide="x"></i></button>
         </div>
         <input id="phaseIdInput" type="hidden" />
-        <label>
-          Descripción del documento
-          <input id="phaseDocNameInput" type="text" placeholder="Ej. Convocatoria oficial" required />
-        </label>
-        <label>
-          Archivo (PDF o imagen)
-          <input
-            id="phaseDocFile"
-            type="file"
-            accept=".pdf,image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.doc,.docx,.xls,.xlsx"
-            required
-          />
+        <label>Descripción del documento<input id="phaseDocNameInput" type="text" placeholder="Ej. Convocatoria oficial" required /></label>
+        <label>Archivo (PDF, imagen o documento)
+          <input id="phaseDocFile" type="file" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" required />
         </label>
         <p id="phaseUploadStatus" class="upload-status" role="status"></p>
         <div class="dialog-actions">
           <button class="ghost-button" type="button" data-close-dialog="phaseUploadDialog">Cancelar</button>
-          <button class="primary-action" type="submit">
-            <i data-lucide="upload-cloud" aria-hidden="true"></i>
-            Subir documento
-          </button>
+          <button class="primary-action" type="submit"><i data-lucide="upload-cloud"></i> Subir</button>
         </div>
       </form>
     </dialog>
 
-    <!-- DIALOG: Usuarios -->
+    <!-- Usuarios -->
     <dialog id="usersDialog">
-      <form id="userForm" method="dialog" class="dialog-form">
+      <form id="userForm" class="dialog-form">
         <div class="dialog-header">
-          <div>
-            <p class="eyebrow">Seguridad</p>
-            <h2>Usuarios</h2>
-          </div>
-          <button class="icon-button" type="button" data-close-dialog="usersDialog" title="Cerrar">
-            <i data-lucide="x" aria-hidden="true"></i>
-          </button>
+          <div><p class="eyebrow">Seguridad</p><h2>Usuarios</h2></div>
+          <button class="icon-button" type="button" data-close-dialog="usersDialog"><i data-lucide="x"></i></button>
         </div>
         <div class="form-grid">
-          <label>
-            Nombre visible
-            <input id="newUserNameInput" type="text" placeholder="Ej. Compras" required />
-          </label>
-          <label>
-            Usuario
-            <input id="newUsernameInput" type="text" placeholder="usuario" required />
-          </label>
-          <label>
-            Contraseña
-            <input id="newUserPasswordInput" type="password" minlength="6" required />
-          </label>
-          <label>
-            Perfil
+          <label>Nombre visible<input id="newUserNameInput" type="text" placeholder="Ej. Compras" required /></label>
+          <label>Usuario<input id="newUsernameInput" type="text" placeholder="usuario" required /></label>
+          <label>Contraseña<input id="newUserPasswordInput" type="password" minlength="6" required /></label>
+          <label>Perfil
             <select id="newUserRoleInput" required>
               <option value="Usuario">Usuario</option>
               <option value="Operaciones">Operaciones</option>
@@ -569,24 +390,13 @@
         </div>
         <p id="userFormError" class="form-error" role="alert"></p>
         <div class="dialog-actions">
-          <button class="primary-action" type="submit">
-            <i data-lucide="user-plus" aria-hidden="true"></i>
-            Alta usuario
-          </button>
+          <button class="primary-action" type="submit"><i data-lucide="user-plus"></i> Alta usuario</button>
         </div>
       </form>
       <div class="dialog-table">
         <div class="responsive-table">
           <table>
-            <thead>
-              <tr>
-                <th>Usuario</th>
-                <th>Nombre</th>
-                <th>Perfil</th>
-                <th>Estado</th>
-                <th></th>
-              </tr>
-            </thead>
+            <thead><tr><th>Usuario</th><th>Nombre</th><th>Perfil</th><th>Estado</th><th></th></tr></thead>
             <tbody id="usersTable"></tbody>
           </table>
         </div>
