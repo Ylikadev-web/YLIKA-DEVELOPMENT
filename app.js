@@ -36,7 +36,7 @@ const QUOTE_TEMPLATES = {
     subtitle: "Materiales de construcción y ferretería",
     website: "",
     phones: "55-8550-7827 | 56-2424-0009",
-    emails: "ventas@ylikamateriales.com",
+    emails: "distribuidoramoneventas@gmail.com",
     conditions: [
       "PRECIOS SUJETOS A CAMBIOS SIN PREVIO AVISO.",
       "TIEMPO DE ENTREGA ESTIMADO: 24 A 72 HORAS.",
