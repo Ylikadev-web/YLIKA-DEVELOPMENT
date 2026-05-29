@@ -29,7 +29,9 @@
       <header class="topbar">
         <div><p class="eyebrow">Panel administrativo</p><h1>YLIKA Licitaciones</h1></div>
         <div class="topbar-actions">
-          <button id="usersButton" class="ghost-button" type="button"><i data-lucide="users"></i> Usuarios</button>
+          <button id="partnersButton" class="ghost-button is-hidden" type="button"><i data-lucide="bar-chart-2"></i> Socios</button>
+          <button id="usersButton" class="ghost-button is-hidden" type="button"><i data-lucide="users"></i> Usuarios</button>
+          <button id="syncButton" class="ghost-button" type="button" title="Sincronizar datos"><i data-lucide="refresh-cw"></i> Sync</button>
           <span class="session-chip"><i data-lucide="shield-check"></i><span id="currentUserLabel">Admin</span></span>
           <button id="logoutButton" class="ghost-button" type="button"><i data-lucide="log-out"></i> Salir</button>
         </div>
@@ -86,7 +88,7 @@
             <button class="tab-button" type="button" data-tab="phases"><i data-lucide="landmark"></i> Documentación</button>
           </nav>
 
-          <!-- TAB: PRODUCTOS -->
+          <!-- PRODUCTOS -->
           <section id="productsPanel" class="tab-panel">
             <div class="section-heading">
               <div><p class="eyebrow">Contrato</p><h3>Productos</h3></div>
@@ -98,7 +100,7 @@
                   <tr>
                     <th>Tipo</th><th>Producto</th><th>Sector</th><th>Partida</th>
                     <th>Unidad</th><th>Cantidad</th><th>P. Unit. s/IVA</th>
-                    <th>P. Unit. c/IVA</th><th>% Ganancia</th><th>Entregado</th>
+                    <th>P. Unit. c/IVA</th><th>% Gan.</th><th>Entregado</th>
                     <th>Total c/IVA</th><th></th>
                   </tr>
                 </thead>
@@ -107,16 +109,19 @@
             </div>
           </section>
 
-          <!-- TAB: PEDIDOS -->
+          <!-- PEDIDOS -->
           <section id="ordersPanel" class="tab-panel is-hidden">
             <div class="section-heading">
               <div><p class="eyebrow">Gestión</p><h3>Pedidos</h3></div>
-              <button id="newOrderButton" class="secondary-action" type="button"><i data-lucide="plus"></i> Nuevo pedido</button>
+              <div class="button-row">
+                <button id="printFinalRemisionButton" class="ghost-button" type="button"><i data-lucide="printer"></i> Remisión final</button>
+                <button id="newOrderButton" class="secondary-action" type="button"><i data-lucide="plus"></i> Nuevo pedido</button>
+              </div>
             </div>
             <div id="ordersContainer"></div>
           </section>
 
-          <!-- TAB: COTIZACIÓN -->
+          <!-- COTIZACIÓN -->
           <section id="quotePanel" class="tab-panel is-hidden">
             <div class="section-heading">
               <div><p class="eyebrow">IVA 16%</p><h3>Cotización</h3></div>
@@ -134,28 +139,21 @@
                 <tbody id="quoteLinesTable"></tbody>
               </table>
             </div>
-            <article id="quotePreview" class="quote-preview"></article>
+            <!-- Print area — only this renders on print -->
+            <div id="quotePrintArea"></div>
           </section>
 
-          <!-- TAB: ARCHIVOS -->
+          <!-- ARCHIVOS -->
           <section id="documentsPanel" class="tab-panel is-hidden">
-            <div class="section-heading">
-              <div><p class="eyebrow">Google Drive</p><h3>Archivos</h3></div>
-            </div>
+            <div class="section-heading"><div><p class="eyebrow">Google Drive</p><h3>Archivos</h3></div></div>
             <form id="uploadForm" class="upload-form">
               <label>Tipo
                 <select id="documentType" required>
-                  <option value="Factura">Factura</option>
-                  <option value="Remisión">Remisión</option>
-                  <option value="Contrato">Contrato</option>
-                  <option value="Cotización">Cotización</option>
-                  <option value="Evidencia">Evidencia</option>
-                  <option value="Otro">Otro</option>
+                  <option>Factura</option><option>Remisión</option><option>Contrato</option>
+                  <option>Cotización</option><option>Evidencia</option><option>Otro</option>
                 </select>
               </label>
-              <label>Archivo
-                <input id="documentFile" type="file" accept=".pdf,.xls,.xlsx,.xml,.doc,.docx,.csv,.png,.jpg,.jpeg,.webp,.gif,image/*" required />
-              </label>
+              <label>Archivo<input id="documentFile" type="file" accept=".pdf,.xls,.xlsx,.xml,.doc,.docx,.csv,.png,.jpg,.jpeg,.webp,image/*" required /></label>
               <button class="primary-action" type="submit"><i data-lucide="upload-cloud"></i> Subir</button>
             </form>
             <p id="uploadStatus" class="upload-status" role="status"></p>
@@ -167,20 +165,21 @@
             </div>
           </section>
 
-          <!-- TAB: DOCUMENTACIÓN (FASES) -->
+          <!-- DOCUMENTACIÓN -->
           <section id="phasesPanel" class="tab-panel is-hidden">
-            <div class="section-heading">
-              <div><p class="eyebrow">Proceso licitatorio</p><h3>Documentación por fase</h3></div>
-            </div>
+            <div class="section-heading"><div><p class="eyebrow">Proceso licitatorio</p><h3>Documentación por fase</h3></div></div>
             <div id="phasesContainer" class="phases-container"></div>
           </section>
         </section>
       </div>
+
+      <!-- REMISIÓN FINAL (print only) -->
+      <div id="finalRemisionPrint" class="is-hidden"></div>
     </div>
 
-    <!-- ═══════════ DIALOGS ═══════════ -->
+    <!-- ════════════ DIALOGS ════════════ -->
 
-    <!-- Nueva licitación -->
+    <!-- Licitación -->
     <dialog id="tenderDialog">
       <form id="tenderForm" class="dialog-form">
         <div class="dialog-header">
@@ -193,8 +192,11 @@
           <label>Cliente / dependencia<input id="clientInput" type="text" required /></label>
           <label>Número de contrato<input id="contractInput" type="text" required /></label>
           <label>Fecha límite<input id="deadlineInput" type="date" /></label>
+          <label>Dirección del cliente<input id="clientAddressInput" type="text" placeholder="Calle, Ciudad, Estado" /></label>
+          <label>Teléfono del cliente<input id="clientPhoneInput" type="text" placeholder="55 0000 0000" /></label>
+          <label style="grid-column:1/-1">Email del cliente<input id="clientEmailInput" type="email" placeholder="cliente@ejemplo.com" /></label>
         </div>
-        <label>Notas<textarea id="notesInput" rows="3"></textarea></label>
+        <label>Notas<textarea id="notesInput" rows="2"></textarea></label>
         <div class="dialog-actions">
           <button class="ghost-button" type="button" data-close-dialog="tenderDialog">Cancelar</button>
           <button class="primary-action" type="submit"><i data-lucide="save"></i> Guardar</button>
@@ -202,7 +204,7 @@
       </form>
     </dialog>
 
-    <!-- Agregar producto (con sector, partida, IVA calc, % ganancia, fuera de contrato) -->
+    <!-- Producto -->
     <dialog id="productDialog">
       <form id="productForm" class="dialog-form">
         <div class="dialog-header">
@@ -210,47 +212,30 @@
           <button class="icon-button" type="button" data-close-dialog="productDialog"><i data-lucide="x"></i></button>
         </div>
         <input id="productIdInput" type="hidden" />
-
-        <!-- Tipo de contrato -->
         <div class="contract-type-toggle">
-          <label class="toggle-option">
-            <input type="radio" name="contractType" id="contractTypeIn" value="in" checked />
-            <span><i data-lucide="check-circle"></i> Dentro de contrato</span>
-          </label>
-          <label class="toggle-option">
-            <input type="radio" name="contractType" id="contractTypeOut" value="out" />
-            <span><i data-lucide="arrow-left-right"></i> Fuera de contrato</span>
-          </label>
+          <label class="toggle-option"><input type="radio" name="contractType" id="contractTypeIn" value="in" checked /><span><i data-lucide="check-circle"></i> Dentro de contrato</span></label>
+          <label class="toggle-option"><input type="radio" name="contractType" id="contractTypeOut" value="out" /><span><i data-lucide="arrow-left-right"></i> Fuera de contrato</span></label>
         </div>
-
-        <!-- Partida sustituida (solo fuera de contrato) -->
         <div id="substituteRow" class="substitute-row is-hidden">
-          <label style="grid-column:1/-1">
-            Sustituye a (partida del contrato)
-            <select id="substituteProductInput">
-              <option value="">— Selecciona la partida que libera uso —</option>
-            </select>
+          <label style="grid-column:1/-1">Sustituye a (partida del contrato)
+            <select id="substituteProductInput"><option value="">— Selecciona la partida —</option></select>
           </label>
         </div>
-
         <div class="form-grid">
-          <label>Producto / descripción<input id="productNameInput" type="text" required /></label>
+          <label>Producto<input id="productNameInput" type="text" required /></label>
           <label>Unidad<input id="unitInput" type="text" value="pieza" required /></label>
           <label>Sector<input id="sectorInput" type="text" placeholder="Ej. Salud, Infraestructura" /></label>
-          <label>Partida presupuestal<input id="partidaInput" type="text" placeholder="Ej. 2531, 5151" /></label>
+          <label>Partida presupuestal<input id="partidaInput" type="text" placeholder="Ej. 2531" /></label>
           <label>Cantidad contratada<input id="quantityInput" type="number" min="0" step="0.01" required /></label>
-          <label>Precio unit. sin IVA
-            <input id="priceInput" type="number" min="0" step="0.01" required />
-          </label>
-          <label>% Ganancia<input id="profitInput" type="number" min="0" step="0.1" value="0" placeholder="Ej. 15" /></label>
-          <label>— Calculados —
+          <label>Precio unit. sin IVA<input id="priceInput" type="number" min="0" step="0.01" required /></label>
+          <label>% Ganancia<input id="profitInput" type="number" min="0" step="0.1" value="0" /></label>
+          <label>Calculado
             <div class="calc-row">
               <span>c/IVA: <strong id="calcWithIva">$0.00</strong></span>
-              <span>c/ganancia: <strong id="calcWithProfit">$0.00</strong></span>
+              <span>c/gan.: <strong id="calcWithProfit">$0.00</strong></span>
             </div>
           </label>
         </div>
-
         <div class="dialog-actions">
           <button class="ghost-button" type="button" data-close-dialog="productDialog">Cancelar</button>
           <button class="primary-action" type="submit"><i data-lucide="save"></i> Guardar</button>
@@ -258,7 +243,7 @@
       </form>
     </dialog>
 
-    <!-- Nuevo pedido -->
+    <!-- Pedido -->
     <dialog id="orderDialog">
       <form id="orderForm" class="dialog-form">
         <div class="dialog-header">
@@ -267,32 +252,18 @@
         </div>
         <input id="orderIdInput" type="hidden" />
         <div class="form-grid">
-          <label>Producto
-            <select id="orderProductInput" required></select>
-          </label>
-          <label>Cantidad pedida
-            <input id="orderQtyInput" type="number" min="0.01" step="0.01" required />
-          </label>
-          <label>Fecha pedido
-            <input id="orderDateInput" type="date" required />
-          </label>
-          <label>Fecha entrega estimada
-            <input id="orderEtaInput" type="date" />
-          </label>
-          <label style="grid-column:1/-1">Solicitó / proveedor
-            <input id="orderRequestedByInput" type="text" />
-          </label>
+          <label>Producto<select id="orderProductInput" required></select></label>
+          <label>Cantidad pedida<input id="orderQtyInput" type="number" min="0.01" step="0.01" required /></label>
+          <label>Fecha pedido<input id="orderDateInput" type="date" required /></label>
+          <label>Fecha entrega estimada<input id="orderEtaInput" type="date" /></label>
+          <label style="grid-column:1/-1">Solicitó / proveedor<input id="orderRequestedByInput" type="text" /></label>
         </div>
         <label>Observaciones<textarea id="orderNotesInput" rows="2"></textarea></label>
-
-        <!-- Subir remisión opcional al crear -->
         <label class="evidence-label">
-          <span class="evidence-required-badge"><i data-lucide="file-text"></i> Remisión / evidencia</span>
-          Adjunta PDF o imagen de la remisión (opcional al crear; obligatorio al marcar entregado)
+          <span class="evidence-required-badge"><i data-lucide="file-text"></i> Remisión / evidencia (opcional)</span>
           <input id="orderEvidenceFile" type="file" accept=".pdf,image/*,.png,.jpg,.jpeg,.webp" />
         </label>
         <p id="orderEvidenceError" class="form-error"></p>
-
         <div class="dialog-actions">
           <button class="ghost-button" type="button" data-close-dialog="orderDialog">Cancelar</button>
           <button class="primary-action" type="submit"><i data-lucide="save"></i> Guardar pedido</button>
@@ -300,11 +271,11 @@
       </form>
     </dialog>
 
-    <!-- Marcar entrega de pedido -->
+    <!-- Entrega de pedido -->
     <dialog id="orderDeliveryDialog">
       <form id="orderDeliveryForm" class="dialog-form">
         <div class="dialog-header">
-          <h2>Registrar entrega de pedido</h2>
+          <h2>Registrar entrega</h2>
           <button class="icon-button" type="button" data-close-dialog="orderDeliveryDialog"><i data-lucide="x"></i></button>
         </div>
         <input id="odOrderIdInput" type="hidden" />
@@ -328,7 +299,7 @@
       </form>
     </dialog>
 
-    <!-- Agregar línea cotización -->
+    <!-- Línea cotización -->
     <dialog id="quoteLineDialog">
       <form id="quoteLineForm" class="dialog-form">
         <div class="dialog-header">
@@ -349,7 +320,7 @@
       </form>
     </dialog>
 
-    <!-- Subir doc de fase -->
+    <!-- Fase doc -->
     <dialog id="phaseUploadDialog">
       <form id="phaseUploadForm" class="dialog-form">
         <div class="dialog-header">
@@ -357,10 +328,8 @@
           <button class="icon-button" type="button" data-close-dialog="phaseUploadDialog"><i data-lucide="x"></i></button>
         </div>
         <input id="phaseIdInput" type="hidden" />
-        <label>Descripción del documento<input id="phaseDocNameInput" type="text" placeholder="Ej. Convocatoria oficial" required /></label>
-        <label>Archivo (PDF, imagen o documento)
-          <input id="phaseDocFile" type="file" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" required />
-        </label>
+        <label>Descripción<input id="phaseDocNameInput" type="text" required /></label>
+        <label>Archivo<input id="phaseDocFile" type="file" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" required /></label>
         <p id="phaseUploadStatus" class="upload-status" role="status"></p>
         <div class="dialog-actions">
           <button class="ghost-button" type="button" data-close-dialog="phaseUploadDialog">Cancelar</button>
@@ -377,14 +346,15 @@
           <button class="icon-button" type="button" data-close-dialog="usersDialog"><i data-lucide="x"></i></button>
         </div>
         <div class="form-grid">
-          <label>Nombre visible<input id="newUserNameInput" type="text" placeholder="Ej. Compras" required /></label>
-          <label>Usuario<input id="newUsernameInput" type="text" placeholder="usuario" required /></label>
+          <label>Nombre visible<input id="newUserNameInput" type="text" required /></label>
+          <label>Usuario<input id="newUsernameInput" type="text" required /></label>
           <label>Contraseña<input id="newUserPasswordInput" type="password" minlength="6" required /></label>
           <label>Perfil
             <select id="newUserRoleInput" required>
               <option value="Usuario">Usuario</option>
               <option value="Operaciones">Operaciones</option>
               <option value="Ventas">Ventas</option>
+              <option value="Socio">Socio</option>
             </select>
           </label>
         </div>
@@ -400,6 +370,52 @@
             <tbody id="usersTable"></tbody>
           </table>
         </div>
+      </div>
+    </dialog>
+
+    <!-- Dashboard socios (solo admin/socios) -->
+    <dialog id="partnersDialog" style="width:min(100% - 24px, 1000px)">
+      <div class="dialog-form">
+        <div class="dialog-header">
+          <div><p class="eyebrow">Confidencial</p><h2>Dashboard de Socios</h2></div>
+          <button class="icon-button" type="button" data-close-dialog="partnersDialog"><i data-lucide="x"></i></button>
+        </div>
+        <div id="partnersDashboard"></div>
+      </div>
+    </dialog>
+
+    <!-- Sync info -->
+    <dialog id="syncDialog">
+      <div class="dialog-form">
+        <div class="dialog-header">
+          <h2>Sincronización entre dispositivos</h2>
+          <button class="icon-button" type="button" data-close-dialog="syncDialog"><i data-lucide="x"></i></button>
+        </div>
+        <p style="color:var(--muted);font-size:.9rem;line-height:1.6">
+          Los datos se guardan en <strong>localStorage</strong> del navegador. Para sincronizar entre dispositivos usa uno de estos métodos:
+        </p>
+        <div class="sync-options">
+          <div class="sync-option">
+            <i data-lucide="upload"></i>
+            <div>
+              <strong>Exportar datos</strong>
+              <p>Descarga un archivo JSON con toda la información para importarlo en otro dispositivo.</p>
+              <button class="primary-action" type="button" id="exportDataButton"><i data-lucide="download"></i> Exportar JSON</button>
+            </div>
+          </div>
+          <div class="sync-option">
+            <i data-lucide="download"></i>
+            <div>
+              <strong>Importar datos</strong>
+              <p>Carga un archivo JSON exportado previamente para restaurar o sincronizar datos.</p>
+              <label class="primary-action" style="cursor:pointer">
+                <i data-lucide="upload"></i> Importar JSON
+                <input id="importDataFile" type="file" accept=".json" style="display:none" />
+              </label>
+            </div>
+          </div>
+        </div>
+        <p id="syncStatus" class="upload-status" role="status"></p>
       </div>
     </dialog>
   </body>
