@@ -20,7 +20,6 @@ const QUOTE_TEMPLATES = {
     phones: "55-8550-7827 | 55-1957-2484 | 56-2424-0009 | 56-3407-1953",
     emails: "ylikamateriales@gmail.com · atencionylika@gmail.com · ventas@ylikamateriales.com",
     conditions: [
-      "                                                                         "
       "PRECIOS Y CONDICIONES SUJETOS A CAMBIOS SIN PREVIO AVISO (PRECIO AL DÍA).",
       "TIEMPO DE ENTREGA ESTIMADO ES DE 24 A 72 HORAS, CON EXCEPCIONES EN ALGUNOS MATERIALES.",
       "UNA VEZ CONFIRMADO EL PEDIDO NO SE PODRÁN HACER CAMBIOS EN DÍA Y LUGAR DE ENTREGA.",
@@ -36,10 +35,9 @@ const QUOTE_TEMPLATES = {
     company: "DISTRIBUIDORA DE MATERIALES Y CONSTRUCCIÓN MONE",
     subtitle: "Materiales de construcción y ferretería",
     website: "",
-    phones: "55-8550-7827 | 56-2424-0009 | 5549008090",
-    emails: "distribuidoramoneventas@gmail.com",
+    phones: "55-8550-7827 | 56-2424-0009",
+    emails: "ventas@mone.com",
     conditions: [
-      "                                                                         "
       "PRECIOS SUJETOS A CAMBIOS SIN PREVIO AVISO.",
       "TIEMPO DE ENTREGA ESTIMADO: 24 A 72 HORAS.",
       "UNA VEZ CONFIRMADO EL PEDIDO NO SE PODRÁN HACER MODIFICACIONES.",
