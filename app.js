@@ -36,7 +36,7 @@ const QUOTE_TEMPLATES = {
     company: "DISTRIBUIDORA DE MATERIALES Y CONSTRUCCIÓN MONE",
     subtitle: "Materiales de construcción y ferretería",
     website: "",
-    phones: "55-8550-7827 | 56-2424-0009",
+    phones: "55-8550-7827 | 56-2424-0009 | 55-4900-8090",
     emails: "distribuidoramoneventas@gmail.com",
     conditions: [
       "                                                                         ",
